@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Cutter & Rearranger</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles for responsiveness and appearance */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f2f5;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+        }
+        .container {
+            background-color: #ffffff;
+            border-radius: 1rem;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            padding: 2rem;
+            max-width: 1200px;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            align-items: center;
+        }
+        canvas {
+            border: 2px solid #cbd5e1; /* slate-300 */
+            border-radius: 0.75rem; /* rounded-xl */
+            background-color: #f8fafc; /* slate-50 */
+            max-width: 100%;
+            height: auto; /* Maintain aspect ratio */
+            touch-action: none; /* Prevent browser touch actions like scrolling/zooming */
+        }
+        .pieces-container {
+            min-height: 150px; /* Give some initial height */
+            background-color: #e2e8f0; /* slate-200 */
+            border-radius: 0.75rem;
+            padding: 1rem;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            justify-content: center;
+            align-items: flex-start;
+            border: 2px dashed #94a3b8; /* slate-400 */
+        }
+        .piece-item {
+            position: relative;
+            cursor: grab;
+            border: 2px solid transparent;
+            transition: border-color 0.2s ease;
+            user-select: none;
+            touch-action: none; /* Prevent browser touch actions like scrolling/zooming */
+        }
+        .piece-item:hover {
+            border-color: #4f46e5; /* indigo-600 */
+        }
+        .piece-item.dragging {
+            opacity: 0.8;
+            cursor: grabbing;
+            z-index: 100;
+        }
+        .piece-item img {
+            display: block; /* Remove extra space below image */
+            max-width: 100%; /* Ensure image fits container */
+            height: auto; /* Maintain aspect ratio */
+            border-radius: 0.5rem; /* rounded-lg */
+        }
+        .action-buttons button {
+            transition: background-color 0.2s ease, transform 0.1s ease;
+        }
+        .action-buttons button:hover {
+            transform: translateY(-2px);
+        }
+        .action-buttons button:active {
+            transform: translateY(0);
+        }
+        /* Message Box Styling */
+        .message-box {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: #fff;
+            padding: 20px 30px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            align-items: center;
+            text-align: center;
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        .message-box button {
+            padding: 8px 20px;
+            background-color: #4f46e5;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+
+        .message-box button:hover {
+            background-color: #4338ca;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translate(-50%, -60%); }
+            to { opacity: 1; transform: translate(-50%, -50%); }
+        }
+
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-center min-h-screen bg-gray-100 p-4">
+    <div class="container">
+        <h1 class="text-3xl font-bold text-gray-800 mb-4">Image Cutter & Rearranger</h1>
+
+        <!-- File Upload Section -->
+        <div class="w-full text-center mb-6">
+            <label for="imageUpload" class="block text-lg font-medium text-gray-700 mb-2">Upload an Image:</label>
+            <input type="file" id="imageUpload" accept="image/*" class="block w-full text-sm text-gray-500
+                file:mr-4 file:py-2 file:px-4
+                file:rounded-full file:border-0
+                file:text-sm file:font-semibold
+                file:bg-indigo-50 file:text-indigo-700
+                hover:file:bg-indigo-100"/>
+        </div>
+
+        <!-- Main Canvas for Drawing -->
+        <div class="w-full flex justify-center">
+            <canvas id="mainCanvas" class="shadow-lg"></canvas>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="action-buttons flex flex-wrap justify-center gap-4 mt-6 w-full">
+            <button id="cutButton" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-full shadow-lg transition-all text-lg disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                Cut Selected Area
+            </button>
+            <button id="saveAllButton" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-full shadow-lg transition-all text-lg disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                Save All Pieces
+            </button>
+            <button id="resetButton" class="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-full shadow-lg transition-all text-lg disabled:opacity-50 disabled:cursor-not-allowed">
+                Reset
+            </button>
+        </div>
+
+        <!-- Extracted Pieces Display Area -->
+        <div class="w-full mt-8">
+            <h2 class="text-xl font-semibold text-gray-700 mb-4 text-center">Extracted Pieces (Drag to Rearrange):</h2>
+            <div id="piecesContainer" class="pieces-container shadow-inner">
+                <!-- Extracted image pieces will be appended here -->
+                <p class="text-gray-500 text-center w-full">Upload an image and draw to start cutting!</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Get references to DOM elements
+        const imageUpload = document.getElementById('imageUpload');
+        const mainCanvas = document.getElementById('mainCanvas');
+        const cutButton = document.getElementById('cutButton');
+        const saveAllButton = document.getElementById('saveAllButton');
+        const resetButton = document.getElementById('resetButton');
+        const piecesContainer = document.getElementById('piecesContainer');
+        const mainCtx = mainCanvas.getContext('2d');
+
+        // Global variables for image and drawing state
+        let originalImage = null;
+        let drawing = false;
+        let currentPath = []; // Stores points for the current drawing path
+        let allPaths = [];    // Stores all completed paths (for potential re-drawing or multiple cuts)
+        let extractedPieces = []; // Stores Data URLs of the extracted image pieces
+
+        // Variables for drag-and-drop
+        let draggedItem = null;
+        let initialX, initialY;
+        let currentTranslateX = 0;
+        let currentTranslateY = 0;
+
+        /**
+         * Displays a custom message box to the user instead of alert().
+         * @param {string} message - The message to display.
+         * @param {string} type - Type of message (e.g., 'info', 'error').
+         * @returns {Promise<void>} - A promise that resolves when the message box is closed.
+         */
+        function showMessageBox(message, type = 'info') {
+            return new Promise(resolve => {
+                // Create overlay to dim background
+                const overlay = document.createElement('div');
+                overlay.className = 'overlay';
+                document.body.appendChild(overlay);
+
+                // Create message box
+                const messageBox = document.createElement('div');
+                messageBox.className = 'message-box';
+                messageBox.innerHTML = `
+                    <p class="text-lg font-medium">${message}</p>
+                    <button id="messageBoxOkButton" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded">OK</button>
+                `;
+                document.body.appendChild(messageBox);
+
+                // Add event listener to OK button
+                const okButton = document.getElementById('messageBoxOkButton');
+                okButton.onclick = () => {
+                    document.body.removeChild(messageBox);
+                    document.body.removeChild(overlay);
+                    resolve();
+                };
+            });
+        }
+
+
+        /**
+         * Resets the application to its initial state.
+         */
+        function resetApp() {
+            originalImage = null;
+            drawing = false;
+            currentPath = [];
+            allPaths = [];
+            extractedPieces = [];
+            mainCtx.clearRect(0, 0, mainCanvas.width, mainCanvas.height);
+            mainCanvas.width = 0;
+            mainCanvas.height = 0;
+            piecesContainer.innerHTML = '<p class="text-gray-500 text-center w-full">Upload an image and draw to start cutting!</p>';
+            cutButton.disabled = true;
+            saveAllButton.disabled = true;
+            imageUpload.value = ''; // Clear file input
+            showMessageBox('Application reset successfully!', 'info');
+        }
+
+        /**
+         * Draws the original image onto the main canvas.
+         */
+        function drawImageOnCanvas() {
+            if (!originalImage) return;
+
+            // Set canvas dimensions to match image aspect ratio, max width of container
+            const maxWidth = mainCanvas.parentElement.clientWidth;
+            const maxHeight = window.innerHeight * 0.6; // Max 60% of viewport height
+
+            let newWidth = originalImage.width;
+            let newHeight = originalImage.height;
+
+            // Scale down if image is too large
+            if (newWidth > maxWidth) {
+                newHeight = (newHeight / newWidth) * maxWidth;
+                newWidth = maxWidth;
+            }
+            if (newHeight > maxHeight) {
+                newWidth = (newWidth / newHeight) * maxHeight;
+                newHeight = maxHeight;
+            }
+
+            mainCanvas.width = newWidth;
+            mainCanvas.height = newHeight;
+
+            mainCtx.clearRect(0, 0, mainCanvas.width, mainCanvas.height); // Clear existing content
+            mainCtx.drawImage(originalImage, 0, 0, mainCanvas.width, mainCanvas.height);
+            mainCtx.strokeStyle = '#4f46e5'; // Indigo-600 for drawing
+            mainCtx.lineWidth = 3;
+            mainCtx.lineJoin = 'round';
+            mainCtx.lineCap = 'round';
+            mainCtx.globalAlpha = 0.7; // Slightly transparent drawing
+        }
+
+        /**
+         * Redraws all completed paths on the canvas.
+         */
+        function redrawPaths() {
+            mainCtx.clearRect(0, 0, mainCanvas.width, mainCanvas.height); // Clear canvas
+            drawImageOnCanvas(); // Redraw original image
+
+            mainCtx.beginPath();
+            allPaths.forEach(path => {
+                if (path.length > 0) {
+                    mainCtx.moveTo(path[0].x, path[0].y);
+                    for (let i = 1; i < path.length; i++) {
+                        mainCtx.lineTo(path[i].x, path[i].y);
+                    }
+                    if (path.length > 2) { // Close path if it's a polygon
+                        mainCtx.lineTo(path[0].x, path[0].y); // Close path to starting point
+                    }
+                }
+            });
+            mainCtx.stroke();
+        }
+
+        /**
+         * Handles image file selection and loads it onto the canvas.
+         * @param {Event} e - The file input change event.
+         */
+        imageUpload.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        originalImage = img;
+                        drawImageOnCanvas();
+                        cutButton.disabled = false;
+                        saveAllButton.disabled = false;
+                        resetButton.disabled = false;
+                        piecesContainer.innerHTML = '<p class="text-gray-500 text-center w-full">Draw on the image to cut pieces!</p>';
+                    };
+                    img.onerror = () => {
+                        showMessageBox('Could not load image. Please try a different file.', 'error');
+                        resetApp();
+                    };
+                    img.src = event.target.result;
+                };
+                reader.onerror = () => {
+                    showMessageBox('Error reading file. Please try again.', 'error');
+                    resetApp();
+                };
+                reader.readAsDataURL(file);
+            } else {
+                // If no file is selected, effectively reset state related to image
+                resetApp();
+            }
+        });
+
+        /**
+         * Gets the mouse/touch coordinates relative to the canvas.
+         * @param {Event} event - The mouse or touch event.
+         * @returns {Object} - An object with x and y coordinates.
+         */
+        function getCanvasCoordinates(event) {
+            const rect = mainCanvas.getBoundingClientRect();
+            let clientX, clientY;
+
+            // Check if it's a touch event
+            if (event.touches && event.touches.length > 0) {
+                clientX = event.touches[0].clientX;
+                clientY = event.touches[0].clientY;
+            } else {
+                clientX = event.clientX;
+                clientY = event.clientY;
+            }
+
+            return {
+                x: (clientX - rect.left) * (mainCanvas.width / rect.width),
+                y: (clientY - rect.top) * (mainCanvas.height / rect.height)
+            };
+        }
+
+        /**
+         * Starts drawing on the canvas.
+         * @param {Event} e - The mouse or touch event.
+         */
+        function startDrawing(e) {
+            if (!originalImage) {
+                showMessageBox('Please upload an image first!', 'error');
+                return;
+            }
+            drawing = true;
+            currentPath = []; // Start a new path
+            const coords = getCanvasCoordinates(e);
+            currentPath.push(coords);
+            mainCtx.beginPath();
+            mainCtx.moveTo(coords.x, coords.y);
+            e.preventDefault(); // Prevent default touch behavior (scrolling, zooming)
+        }
+
+        /**
+         * Continues drawing on the canvas.
+         * @param {Event} e - The mouse or touch event.
+         */
+        function draw(e) {
+            if (!drawing) return;
+            const coords = getCanvasCoordinates(e);
+            currentPath.push(coords);
+            mainCtx.lineTo(coords.x, coords.y);
+            mainCtx.stroke();
+            e.preventDefault();
+        }
+
+        /**
+         * Ends drawing on the canvas and closes the path.
+         */
+        function endDrawing() {
+            if (!drawing) return;
+            drawing = false;
+
+            // If the path has at least 3 points, close it to form a shape
+            if (currentPath.length > 2) {
+                mainCtx.lineTo(currentPath[0].x, currentPath[0].y); // Connect last point to first
+                mainCtx.stroke(); // Draw the closing line
+                allPaths.push([...currentPath]); // Store a copy of the completed path
+                // Show a temporary visual indication that path is closed, e.g., fill it briefly
+                mainCtx.save();
+                mainCtx.fillStyle = 'rgba(79, 70, 229, 0.2)'; // Faint indigo fill
+                mainCtx.fill();
+                mainCtx.restore();
+            } else {
+                // If path is too short to form a shape, discard it visually
+                showMessageBox('Please draw a path with at least 3 points to form a cuttable shape.', 'info');
+                redrawPaths(); // Clear incomplete drawing
+            }
+        }
+
+        // Mouse events for drawing
+        mainCanvas.addEventListener('mousedown', startDrawing);
+        mainCanvas.addEventListener('mousemove', draw);
+        mainCanvas.addEventListener('mouseup', endDrawing);
+        mainCanvas.addEventListener('mouseout', () => {
+            // End drawing if mouse leaves canvas, but only if a path was being drawn
+            if (drawing) {
+                endDrawing();
+            }
+        });
+
+        // Touch events for drawing
+        mainCanvas.addEventListener('touchstart', startDrawing);
+        mainCanvas.addEventListener('touchmove', draw);
+        mainCanvas.addEventListener('touchend', endDrawing);
+        mainCanvas.addEventListener('touchcancel', endDrawing); // Handle touch being cancelled
+
+
+        /**
+         * Extracts the image region defined by the last drawn path.
+         */
+        cutButton.addEventListener('click', () => {
+            if (!originalImage || allPaths.length === 0) {
+                showMessageBox('Please upload an image and draw a path first!', 'error');
+                return;
+            }
+
+            const path = allPaths.pop(); // Take the last drawn path
+            if (path.length < 3) {
+                showMessageBox('Cannot cut. A valid closed shape requires at least 3 points.', 'error');
+                return;
+            }
+
+            // Create a temporary offscreen canvas for clipping
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = mainCanvas.width;
+            tempCanvas.height = mainCanvas.height;
+            const tempCtx = tempCanvas.getContext('2d');
+
+            // Draw the path as a clipping mask
+            tempCtx.beginPath();
+            tempCtx.moveTo(path[0].x, path[0].y);
+            for (let i = 1; i < path.length; i++) {
+                tempCtx.lineTo(path[i].x, path[i].y);
+            }
+            tempCtx.closePath();
+            tempCtx.clip(); // Apply the clipping mask
+
+            // Draw the original image within the clipped region
+            tempCtx.drawImage(originalImage, 0, 0, tempCanvas.width, tempCanvas.height);
+
+            // Get the bounding box of the drawn path to crop the extracted image
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+            path.forEach(p => {
+                minX = Math.min(minX, p.x);
+                minY = Math.min(minY, p.y);
+                maxX = Math.max(maxX, p.x);
+                maxY = Math.max(maxY, p.y);
+            });
+
+            // Add some padding to the bounding box to ensure the full clipped shape is captured
+            const padding = 5; // Pixels
+            minX = Math.max(0, minX - padding);
+            minY = Math.max(0, minY - padding);
+            maxX = Math.min(tempCanvas.width, maxX + padding);
+            maxY = Math.min(tempCanvas.height, maxY + padding);
+
+            const width = maxX - minX;
+            const height = maxY - minY;
+
+            if (width <= 0 || height <= 0) {
+                showMessageBox('The drawn shape is too small or invalid for cutting.', 'error');
+                redrawPaths(); // Redraw if the path was removed
+                return;
+            }
+
+            // Create another temporary canvas for the final cropped piece
+            const finalPieceCanvas = document.createElement('canvas');
+            finalPieceCanvas.width = width;
+            finalPieceCanvas.height = height;
+            const finalPieceCtx = finalPieceCanvas.getContext('2d');
+
+            // Draw the clipped image from the first temp canvas onto the final piece canvas, cropped
+            finalPieceCtx.drawImage(tempCanvas, minX, minY, width, height, 0, 0, width, height);
+
+            const pieceDataUrl = finalPieceCanvas.toDataURL('image/png');
+            extractedPieces.push(pieceDataUrl);
+            displayExtractedPiece(pieceDataUrl);
+
+            // Redraw the main canvas without the just-cut path
+            redrawPaths();
+
+            showMessageBox('Piece cut successfully! Drag it below to rearrange.', 'info');
+        });
+
+
+        /**
+         * Displays an extracted image piece in the piecesContainer.
+         * @param {string} dataUrl - The Data URL of the image piece.
+         */
+        function displayExtractedPiece(dataUrl) {
+            // Remove the initial instruction message if pieces are being added
+            const initialMessage = piecesContainer.querySelector('p.text-gray-500');
+            if (initialMessage) {
+                piecesContainer.removeChild(initialMessage);
+            }
+
+            const pieceWrapper = document.createElement('div');
+            pieceWrapper.className = 'piece-item relative rounded-lg shadow-md';
+            // Make pieces draggable using inline style for position property.
+            pieceWrapper.style.position = 'relative'; // Set position to relative for initial placement in flow
+            pieceWrapper.style.transform = `translate(0px, 0px)`; // Initial translation
+
+            const pieceImg = document.createElement('img');
+            pieceImg.src = dataUrl;
+            pieceImg.alt = 'Cut Piece';
+            pieceImg.className = 'rounded-lg max-w-full h-auto'; // Responsive image within its container
+
+            pieceWrapper.appendChild(pieceImg);
+            piecesContainer.appendChild(pieceWrapper);
+
+            // Initialize drag-and-drop for the new piece
+            setupDragAndDrop(pieceWrapper);
+        }
+
+        /**
+         * Sets up drag-and-drop functionality for a given element.
+         * @param {HTMLElement} element - The element to make draggable.
+         */
+        function setupDragAndDrop(element) {
+            element.addEventListener('mousedown', startDrag);
+            element.addEventListener('touchstart', startDrag, { passive: false }); // Use { passive: false } for touchmove
+
+            function startDrag(e) {
+                draggedItem = element;
+                draggedItem.classList.add('dragging');
+                draggedItem.style.zIndex = '100'; // Bring to front
+
+                // Get initial position relative to the container for correct offset calculation
+                const style = window.getComputedStyle(draggedItem);
+                const transform = style.transform;
+                if (transform && transform !== 'none') {
+                    const matrix = new DOMMatrixReadOnly(transform);
+                    currentTranslateX = matrix.m41;
+                    currentTranslateY = matrix.m42;
+                } else {
+                    currentTranslateX = 0;
+                    currentTranslateY = 0;
+                }
+
+                if (e.type === 'touchstart') {
+                    initialX = e.touches[0].clientX - currentTranslateX;
+                    initialY = e.touches[0].clientY - currentTranslateY;
+                } else {
+                    initialX = e.clientX - currentTranslateX;
+                    initialY = e.clientY - currentTranslateY;
+                }
+
+                // Add event listeners to the document for global movement
+                document.addEventListener('mousemove', drag);
+                document.addEventListener('mouseup', endDrag);
+                document.addEventListener('touchmove', drag, { passive: false });
+                document.addEventListener('touchend', endDrag);
+                document.addEventListener('touchcancel', endDrag);
+
+                e.preventDefault(); // Prevent default browser drag behavior
+            }
+
+            function drag(e) {
+                if (!draggedItem) return;
+                let clientX, clientY;
+
+                if (e.type === 'touchmove') {
+                    if (e.touches.length === 0) return; // No touch points available
+                    clientX = e.touches[0].clientX;
+                    clientY = e.touches[0].clientY;
+                } else {
+                    clientX = e.clientX;
+                    clientY = e.clientY;
+                }
+
+                currentTranslateX = clientX - initialX;
+                currentTranslateY = clientY - initialY;
+
+                draggedItem.style.transform = `translate(${currentTranslateX}px, ${currentTranslateY}px)`;
+                // Change position to 'absolute' for free movement once dragging starts
+                if (draggedItem.style.position !== 'absolute') {
+                    const rect = draggedItem.getBoundingClientRect();
+                    const containerRect = piecesContainer.getBoundingClientRect();
+                    draggedItem.style.position = 'absolute';
+                    // Adjust position based on current transform to prevent jump
+                    draggedItem.style.left = `${rect.left - containerRect.left}px`;
+                    draggedItem.style.top = `${rect.top - containerRect.top}px`;
+                    draggedItem.style.transform = `translate(0px, 0px)`; // Reset transform as position is now absolute
+                    currentTranslateX = 0;
+                    currentTranslateY = 0;
+                    initialX = clientX; // Recalculate initial positions
+                    initialY = clientY;
+                }
+                e.preventDefault();
+            }
+
+            function endDrag() {
+                if (draggedItem) {
+                    draggedItem.classList.remove('dragging');
+                    draggedItem.style.zIndex = ''; // Reset z-index
+                    draggedItem = null;
+                }
+                // Remove global event listeners
+                document.removeEventListener('mousemove', drag);
+                document.removeEventListener('mouseup', endDrag);
+                document.removeEventListener('touchmove', drag);
+                document.removeEventListener('touchend', endDrag);
+                document.removeEventListener('touchcancel', endDrag);
+            }
+        }
+
+
+        /**
+         * Saves all extracted pieces as individual PNG files.
+         */
+        saveAllButton.addEventListener('click', () => {
+            if (extractedPieces.length === 0) {
+                showMessageBox('No pieces to save! Please cut some pieces first.', 'error');
+                return;
+            }
+
+            extractedPieces.forEach((dataUrl, index) => {
+                const link = document.createElement('a');
+                link.href = dataUrl;
+                link.download = `cut_piece_${index + 1}.png`;
+                document.body.appendChild(link); // Append to body to make it clickable
+                link.click(); // Programmatically click the link to trigger download
+                document.body.removeChild(link); // Remove after click
+            });
+            showMessageBox('All pieces saved successfully!', 'info');
+        });
+
+        // Reset Button Event Listener
+        resetButton.addEventListener('click', resetApp);
+
+        // Initial setup on window load
+        window.onload = () => {
+            resetApp(); // Ensure initial state is clean and buttons are disabled
+        };
+    </script>
+</body>
+</html>
