@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Color Grouper</title>
+    <!-- Tailwind CSS CDN for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles for the Inter font and canvas responsiveness */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6; /* Light gray background */
+        }
+        canvas {
+            display: block; /* Removes extra space below canvas */
+            margin: 0 auto; /* Center the canvas */
+            max-width: 100%; /* Ensure canvas is responsive */
+            height: auto; /* Maintain aspect ratio */
+            border-radius: 0.5rem; /* Rounded corners for the canvas */
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); /* Subtle shadow */
+        }
+        input[type="range"] {
+            -webkit-appearance: none; /* Remove default styling */
+            width: 100%;
+            height: 8px;
+            background: #d1d5db; /* Light gray track */
+            outline: none;
+            opacity: 0.7;
+            transition: opacity .2s;
+            border-radius: 9999px; /* Fully rounded track */
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none; /* Remove default styling */
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            background: #4f46e5; /* Indigo thumb */
+            cursor: pointer;
+            border-radius: 9999px; /* Fully rounded thumb */
+            box-shadow: 0 2px 4px 0 rgba(0,0,0,0.2);
+        }
+        input[type="range"]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            background: #4f46e5;
+            cursor: pointer;
+            border-radius: 9999px;
+            box-shadow: 0 2px 4px 0 rgba(0,0,0,0.2);
+        }
+    </style>
+</head>
+<body class="p-6">
+    <div class="max-w-4xl mx-auto bg-white p-8 rounded-lg shadow-xl">
+        <h1 class="text-3xl font-bold text-center text-gray-800 mb-6">Image Color Grouper</h1>
+
+        <!-- File Upload Section -->
+        <div class="mb-6">
+            <label for="imageUpload" class="block text-sm font-medium text-gray-700 mb-2">
+                Upload an Image:
+            </label>
+            <input type="file" id="imageUpload" accept="image/*" class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 ease-in-out">
+        </div>
+
+        <!-- Similarity Slider Section -->
+        <div class="mb-8">
+            <label for="similarityRange" class="block text-sm font-medium text-gray-700 mb-2">
+                Color Similarity Threshold: <span id="similarityValue" class="font-semibold text-indigo-600">0</span>
+            </label>
+            <input type="range" id="similarityRange" min="0" max="255" value="0" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+            <p class="text-sm text-gray-500 mt-2">
+                Lower value means colors must be very similar. Higher value allows more variation. Max similarity is 255 (any color).
+            </p>
+        </div>
+
+        <!-- Canvas for Image Display -->
+        <div class="border-2 border-dashed border-gray-300 rounded-lg p-2 flex items-center justify-center min-h-[300px] mb-6 overflow-hidden">
+            <canvas id="imageCanvas" class="bg-gray-100"></canvas>
+            <p id="canvasPlaceholder" class="text-gray-500 text-lg">Upload an image to get started!</p>
+        </div>
+
+        <!-- Instructions and Reset Button -->
+        <div class="text-center mt-4">
+            <p class="text-gray-600 text-sm mb-4">
+                Upload an image, then click on any pixel on the image. Pixels with similar colors that are touching will be grouped and filled with their average color. Adjust the slider to change the similarity threshold.
+            </p>
+            <button id="resetButton" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-md shadow-md transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2">
+                Reset Image
+            </button>
+        </div>
+
+        <!-- Message Box for user feedback -->
+        <div id="messageBox" class="fixed bottom-4 right-4 bg-blue-600 text-white p-3 rounded-lg shadow-lg hidden">
+            <p id="messageText"></p>
+            <button class="absolute top-1 right-2 text-white text-lg font-bold" onclick="document.getElementById('messageBox').classList.add('hidden')">&times;</button>
+        </div>
+    </div>
+
+    <script>
+        // Get references to DOM elements
+        const imageUpload = document.getElementById('imageUpload');
+        const imageCanvas = document.getElementById('imageCanvas');
+        const ctx = imageCanvas.getContext('2d');
+        const similarityRange = document.getElementById('similarityRange');
+        const similarityValueSpan = document.getElementById('similarityValue');
+        const resetButton = document.getElementById('resetButton');
+        const canvasPlaceholder = document.getElementById('canvasPlaceholder');
+        const messageBox = document.getElementById('messageBox');
+        const messageText = document.getElementById('messageText');
+
+        let originalImageData = null; // Stores the original image data for reset
+        let currentImage = new Image(); // The image object being worked on
+        let currentThreshold = 0; // Current similarity threshold
+
+        /**
+         * Displays a message to the user in a styled box.
+         * @param {string} message - The message to display.
+         * @param {number} duration - How long the message should be visible in milliseconds.
+         */
+        function showMessage(message, duration = 3000) {
+            messageText.textContent = message;
+            messageBox.classList.remove('hidden');
+            setTimeout(() => {
+                messageBox.classList.add('hidden');
+            }, duration);
+        }
+
+        /**
+         * Calculates the Euclidean distance between two RGB colors.
+         * This value represents how "different" the two colors are.
+         * @param {number[]} color1 - An array [R, G, B] for the first color.
+         * @param {number[]} color2 - An array [R, G, B] for the second color.
+         * @returns {number} The Euclidean distance.
+         */
+        function getColorDistance(color1, color2) {
+            const dr = color1[0] - color2[0];
+            const dg = color1[1] - color2[1];
+            const db = color1[2] - color2[2];
+            return Math.sqrt(dr * dr + dg * dg + db * db);
+        }
+
+        /**
+         * Draws the image onto the canvas, scaling it to fit while maintaining aspect ratio.
+         * If originalImageData is available, it redraws from that, otherwise from currentImage.
+         * @param {ImageData} [imageDataToDraw=originalImageData] - Optional: specific ImageData to draw.
+         */
+        function drawImageOnCanvas(imageDataToDraw = null) {
+            if (!currentImage.src && !imageDataToDraw) {
+                // If no image is loaded and no data provided, clear canvas and show placeholder
+                ctx.clearRect(0, 0, imageCanvas.width, imageCanvas.height);
+                imageCanvas.style.display = 'none';
+                canvasPlaceholder.style.display = 'block';
+                return;
+            }
+
+            canvasPlaceholder.style.display = 'none'; // Hide placeholder
+            imageCanvas.style.display = 'block'; // Show canvas
+
+            // Set canvas dimensions based on image aspect ratio and container width
+            const maxWidth = imageCanvas.parentElement.clientWidth - 4; // Account for padding
+            const maxHeight = imageCanvas.parentElement.clientHeight - 4; // Account for padding
+
+            let imgWidth, imgHeight;
+
+            if (imageDataToDraw) {
+                // If drawing from ImageData (e.g., reset), use its dimensions
+                imgWidth = imageDataToDraw.width;
+                imgHeight = imageDataToDraw.height;
+            } else {
+                // If drawing a new image, use currentImage dimensions
+                imgWidth = currentImage.naturalWidth;
+                imgHeight = currentImage.naturalHeight;
+            }
+
+            const aspectRatio = imgWidth / imgHeight;
+
+            // Determine new canvas dimensions to fit within max width/height
+            let newWidth = Math.min(imgWidth, maxWidth);
+            let newHeight = newWidth / aspectRatio;
+
+            if (newHeight > maxHeight) {
+                newHeight = maxHeight;
+                newWidth = newHeight * aspectRatio;
+            }
+
+            imageCanvas.width = newWidth;
+            imageCanvas.height = newHeight;
+
+            // Clear the canvas before drawing
+            ctx.clearRect(0, 0, newWidth, newHeight);
+
+            if (imageDataToDraw) {
+                // Create a temporary canvas to scale ImageData for drawing
+                const tempCanvas = document.createElement('canvas');
+                const tempCtx = tempCanvas.getContext('2d');
+                tempCanvas.width = imageDataToDraw.width;
+                tempCanvas.height = imageDataToDraw.height;
+                tempCtx.putImageData(imageDataToDraw, 0, 0);
+
+                ctx.drawImage(tempCanvas, 0, 0, newWidth, newHeight);
+            } else {
+                // Draw the original image (scaled)
+                ctx.drawImage(currentImage, 0, 0, newWidth, newHeight);
+                // Store a copy of the initial image data for reset purposes
+                originalImageData = ctx.getImageData(0, 0, newWidth, newHeight);
+            }
+        }
+
+        /**
+         * Handles image file selection.
+         * Reads the file, creates an Image object, and draws it on the canvas.
+         */
+        imageUpload.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    currentImage.onload = () => {
+                        drawImageOnCanvas(); // Draw the image for the first time
+                        showMessage('Image loaded. Click on a pixel to start grouping colors!');
+                    };
+                    currentImage.onerror = () => {
+                        showMessage('Failed to load image. Please try another file.', 5000);
+                        currentImage.src = ''; // Clear source to prevent further errors
+                        drawImageOnCanvas(); // Clear canvas
+                    };
+                    currentImage.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            } else {
+                currentImage.src = ''; // Clear image if no file selected
+                originalImageData = null;
+                drawImageOnCanvas(); // Clear canvas
+                showMessage('No image selected.');
+            }
+        });
+
+        /**
+         * Updates the displayed similarity value when the slider moves.
+         */
+        similarityRange.addEventListener('input', (event) => {
+            currentThreshold = parseInt(event.target.value, 10);
+            similarityValueSpan.textContent = currentThreshold;
+        });
+
+        /**
+         * Resets the canvas to the original uploaded image.
+         */
+        resetButton.addEventListener('click', () => {
+            if (originalImageData) {
+                drawImageOnCanvas(originalImageData);
+                showMessage('Image reset to original.');
+            } else {
+                showMessage('No image loaded to reset.', 2000);
+            }
+        });
+
+        /**
+         * Implements the flood fill algorithm to identify a connected region
+         * of similar colors and then fills that region with the average color.
+         * @param {number} startX - The x-coordinate of the clicked pixel.
+         * @param {number} startY - The y-coordinate of the clicked pixel.
+         */
+        imageCanvas.addEventListener('click', (event) => {
+            if (!currentImage.src) {
+                showMessage('Please upload an image first.');
+                return;
+            }
+
+            const rect = imageCanvas.getBoundingClientRect();
+            // Calculate coordinates relative to the canvas drawing surface
+            const x = Math.floor((event.clientX - rect.left) / (rect.width / imageCanvas.width));
+            const y = Math.floor((event.clientY - rect.top) / (rect.height / imageCanvas.height));
+
+            if (x < 0 || x >= imageCanvas.width || y < 0 || y >= imageCanvas.height) {
+                // Click was outside the valid canvas area
+                return;
+            }
+
+            const imageData = ctx.getImageData(0, 0, imageCanvas.width, imageCanvas.height);
+            const pixels = imageData.data;
+            const width = imageData.width;
+            const height = imageData.height;
+
+            // Function to get pixel index from (x, y) coordinates
+            function getPixelIndex(px, py) {
+                return (py * width + px) * 4;
+            }
+
+            // Function to get RGB color from pixel index
+            function getPixelColor(index) {
+                return [pixels[index], pixels[index + 1], pixels[index + 2]];
+            }
+
+            // Get the starting pixel's color
+            const startIndex = getPixelIndex(x, y);
+            const targetColor = getPixelColor(startIndex);
+
+            // Check if the current pixel is transparent (alpha=0)
+            if (pixels[startIndex + 3] === 0) {
+                showMessage('Clicked pixel is transparent. Cannot group.', 2000);
+                return;
+            }
+
+            const stack = [[x, y]];
+            const visited = new Set(); // Use a Set to track visited pixels for efficiency
+            const pixelsToFill = []; // Store coordinates of pixels belonging to the connected region
+
+            let totalR = 0;
+            let totalG = 0;
+            let totalB = 0;
+            let pixelCount = 0;
+
+            // Convert coordinates to a string key for the Set
+            function getCoordKey(px, py) {
+                return `${px},${py}`;
+            }
+
+            showMessage('Processing...', 1000); // Give immediate feedback
+
+            while (stack.length > 0) {
+                const [cx, cy] = stack.pop();
+                const currentKey = getCoordKey(cx, cy);
+
+                if (visited.has(currentKey)) {
+                    continue; // Skip if already visited
+                }
+                visited.add(currentKey);
+
+                // Get current pixel color
+                const currentIndex = getPixelIndex(cx, cy);
+                const currentColor = getPixelColor(currentIndex);
+
+                // Check similarity and if not transparent (alpha != 0)
+                if (pixels[currentIndex + 3] !== 0 &&
+                    getColorDistance(targetColor, currentColor) <= currentThreshold) {
+
+                    // Add current pixel's color to the sum
+                    totalR += currentColor[0];
+                    totalG += currentColor[1];
+                    totalB += currentColor[2];
+                    pixelCount++;
+
+                    // Add pixel coordinates to the list to be filled later
+                    pixelsToFill.push([cx, cy]);
+
+                    // Add neighbors to stack (up, down, left, right)
+                    const neighbors = [
+                        [cx + 1, cy], // Right
+                        [cx - 1, cy], // Left
+                        [cx, cy + 1], // Down
+                        [cx, cy - 1]  // Up
+                    ];
+
+                    for (const [nx, ny] of neighbors) {
+                        // Check bounds and if not already visited
+                        if (nx >= 0 && nx < width && ny >= 0 && ny < height && !visited.has(getCoordKey(nx, ny))) {
+                            stack.push([nx, ny]);
+                        }
+                    }
+                }
+            }
+
+            // If no pixels were found (e.g., threshold too low, isolated pixel)
+            if (pixelCount === 0) {
+                showMessage('No similar pixels found for grouping with current threshold.', 2000);
+                return;
+            }
+
+            // Calculate the average color
+            const avgR = Math.round(totalR / pixelCount);
+            const avgG = Math.round(totalG / pixelCount);
+            const avgB = Math.round(totalB / pixelCount);
+            const averageColor = [avgR, avgG, avgB];
+
+            // Now, fill all identified pixels with the calculated average color
+            for (const [px, py] of pixelsToFill) {
+                const index = getPixelIndex(px, py);
+                pixels[index] = averageColor[0];
+                pixels[index + 1] = averageColor[1];
+                pixels[index + 2] = averageColor[2];
+                // Alpha remains unchanged
+            }
+
+            // Put the modified image data back onto the canvas
+            ctx.putImageData(imageData, 0, 0);
+            showMessage(`Grouped ${pixelCount} pixels with average color.`, 3000);
+        });
+
+        // Initialize display for slider value
+        similarityValueSpan.textContent = similarityRange.value;
+
+        // Initial draw call to set up canvas placeholder
+        drawImageOnCanvas();
+
+        // Add a resize listener to redraw the canvas when the window size changes
+        window.addEventListener('resize', () => {
+            // Redraw from original data if available, otherwise current image
+            drawImageOnCanvas(originalImageData || currentImage);
+        });
+    </script>
+</body>
+</html>
