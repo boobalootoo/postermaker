@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Edge Map Viewer</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles for responsiveness and appearance */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f2f5;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            padding: 1rem;
+            box-sizing: border-box;
+        }
+        .container {
+            background-color: #ffffff;
+            border-radius: 1rem;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            padding: 2rem;
+            max-width: 1000px;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            align-items: center;
+        }
+        .canvas-section {
+            display: flex;
+            flex-direction: column; /* Default to column for small screens */
+            gap: 1.5rem;
+            width: 100%;
+            justify-content: center;
+            align-items: flex-start;
+        }
+
+        @media (min-width: 768px) { /* On medium screens and up, arrange side-by-side */
+            .canvas-section {
+                flex-direction: row;
+                align-items: flex-start;
+            }
+        }
+
+        .canvas-wrapper {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+        }
+
+        canvas {
+            border: 2px solid #cbd5e1; /* slate-300 */
+            border-radius: 0.75rem; /* rounded-xl */
+            background-color: #f8fafc; /* slate-50 */
+            max-width: 100%;
+            height: auto; /* Maintain aspect ratio */
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+        }
+
+        /* Message Box Styling */
+        .message-box {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: #fff;
+            padding: 20px 30px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            align-items: center;
+            text-align: center;
+            animation: fadeIn 0.3s ease-out;
+            max-width: 90%;
+        }
+
+        .message-box button {
+            padding: 8px 20px;
+            background-color: #4f46e5;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+
+        .message-box button:hover {
+            background-color: #4338ca;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translate(-50%, -60%); }
+            to { opacity: 1; transform: translate(-50%, -50%); }
+        }
+
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-center min-h-screen bg-gray-100 p-4">
+    <div class="container">
+        <h1 class="text-3xl font-bold text-gray-800 mb-4">Image Edge Map Viewer</h1>
+
+        <!-- File Upload Section -->
+        <div class="w-full text-center mb-6">
+            <label for="imageUpload" class="block text-lg font-medium text-gray-700 mb-2">Upload an Image:</label>
+            <input type="file" id="imageUpload" accept="image/*" class="block w-full text-sm text-gray-500
+                file:mr-4 file:py-2 file:px-4
+                file:rounded-full file:border-0
+                file:text-sm file:font-semibold
+                file:bg-indigo-50 file:text-indigo-700
+                hover:file:bg-indigo-100"/>
+        </div>
+
+        <!-- Edge Detection Controls -->
+        <div class="flex flex-wrap items-center justify-center gap-4 mb-4 w-full">
+            <div class="flex items-center">
+                <label for="edgeThreshold" class="mr-2 text-gray-700">Edge Sensitivity:</label>
+                <input type="range" id="edgeThreshold" min="1" max="100" step="1" value="30" class="w-32">
+                <span id="thresholdValue" class="ml-2 text-gray-600">30</span>
+            </div>
+            <button id="applyEdgeDetection" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-full shadow-md transition-all text-sm disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                Apply Edge Detection
+            </button>
+            <button id="resetButton" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-full shadow-md transition-all text-sm">
+                Reset
+            </button>
+        </div>
+
+        <!-- Canvas Section -->
+        <div class="canvas-section">
+            <div class="canvas-wrapper">
+                <h2 class="text-xl font-semibold text-gray-700 mb-2">Original Image:</h2>
+                <canvas id="originalCanvas"></canvas>
+            </div>
+            <div class="canvas-wrapper">
+                <h2 class="text-xl font-semibold text-gray-700 mb-2">Edge Map:</h2>
+                <canvas id="edgeMapCanvas"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Get references to DOM elements
+        const imageUpload = document.getElementById('imageUpload');
+        const originalCanvas = document.getElementById('originalCanvas');
+        const edgeMapCanvas = document.getElementById('edgeMapCanvas');
+        const edgeThresholdSlider = document.getElementById('edgeThreshold');
+        const thresholdValueSpan = document.getElementById('thresholdValue');
+        const applyEdgeDetectionButton = document.getElementById('applyEdgeDetection');
+        const resetButton = document.getElementById('resetButton');
+
+        const originalCtx = originalCanvas.getContext('2d');
+        const edgeMapCtx = edgeMapCanvas.getContext('2d');
+
+        let originalImage = null; // Stores the loaded Image object
+        let currentEdgeThreshold = 30; // Default edge detection sensitivity
+
+        /**
+         * Displays a custom message box to the user instead of alert().
+         * @param {string} message - The message to display.
+         * @param {string} type - Type of message (e.g., 'info', 'error').
+         * @returns {Promise<void>} - A promise that resolves when the message box is closed.
+         */
+        function showMessageBox(message, type = 'info') {
+            return new Promise(resolve => {
+                const overlay = document.createElement('div');
+                overlay.className = 'overlay';
+                document.body.appendChild(overlay);
+
+                const messageBox = document.createElement('div');
+                messageBox.className = 'message-box';
+                messageBox.innerHTML = `
+                    <p class="text-lg font-medium">${message}</p>
+                    <button id="messageBoxOkButton" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded">OK</button>
+                `;
+                document.body.appendChild(messageBox);
+
+                const okButton = document.getElementById('messageBoxOkButton');
+                okButton.onclick = () => {
+                    document.body.removeChild(messageBox);
+                    document.body.removeChild(overlay);
+                    resolve();
+                };
+            });
+        }
+
+        /**
+         * Resets the application to its initial state.
+         */
+        function resetApp() {
+            originalImage = null;
+            originalCtx.clearRect(0, 0, originalCanvas.width, originalCanvas.height);
+            originalCanvas.width = 0;
+            originalCanvas.height = 0;
+
+            edgeMapCtx.clearRect(0, 0, edgeMapCanvas.width, edgeMapCanvas.height);
+            edgeMapCanvas.width = 0;
+            edgeMapCanvas.height = 0;
+
+            imageUpload.value = ''; // Clear file input
+            applyEdgeDetectionButton.disabled = true;
+            edgeThresholdSlider.value = 30;
+            thresholdValueSpan.textContent = '30';
+            showMessageBox('Application reset successfully!', 'info');
+        }
+
+        /**
+         * Draws the original image onto its canvas, scaling to fit.
+         */
+        function drawOriginalImage() {
+            if (!originalImage) return;
+
+            const maxWidth = originalCanvas.parentElement.clientWidth;
+            const maxHeight = window.innerHeight * 0.4; // Max 40% of viewport height
+
+            let scaledWidth = originalImage.width;
+            let scaledHeight = originalImage.height;
+
+            if (scaledWidth > maxWidth) {
+                scaledHeight = (scaledHeight / scaledWidth) * maxWidth;
+                scaledWidth = maxWidth;
+            }
+            if (scaledHeight > maxHeight) {
+                scaledWidth = (scaledWidth / scaledHeight) * maxHeight;
+                scaledHeight = maxHeight;
+            }
+
+            originalCanvas.width = scaledWidth;
+            originalCanvas.height = scaledHeight;
+            originalCtx.clearRect(0, 0, originalCanvas.width, originalCanvas.height);
+            originalCtx.drawImage(originalImage, 0, 0, originalCanvas.width, originalCanvas.height);
+
+            // Set edge map canvas to the same dimensions as the original image (for accurate pixel processing)
+            edgeMapCanvas.width = originalImage.width;
+            edgeMapCanvas.height = originalImage.height;
+            edgeMapCtx.clearRect(0, 0, edgeMapCanvas.width, edgeMapCanvas.height);
+
+            applyEdgeDetectionButton.disabled = false; // Enable button once image is loaded
+            applyEdgeDetection(); // Automatically apply edge detection on load
+        }
+
+        /**
+         * Applies a simple edge detection filter to the original image and draws it on the edge map canvas.
+         */
+        function applyEdgeDetection() {
+            if (!originalImage) {
+                showMessageBox('Please upload an image first!', 'error');
+                return;
+            }
+
+            // Use a temporary canvas to get the full-resolution image data
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = originalImage.width;
+            tempCanvas.height = originalImage.height;
+            const tempCtx = tempCanvas.getContext('2d');
+            tempCtx.drawImage(originalImage, 0, 0, originalImage.width, originalImage.height);
+
+            const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+            const data = imageData.data;
+            const width = tempCanvas.width;
+            const height = tempCanvas.height;
+
+            // Create a new ImageData for the edge map
+            const edgeData = edgeMapCtx.createImageData(width, height);
+            const edgePixels = edgeData.data;
+
+            // Sobel operator for edge detection (simplified for grayscale)
+            // Grayscale conversion for Sobel
+            const grayData = new Uint8ClampedArray(width * height);
+            for (let i = 0; i < data.length; i += 4) {
+                const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
+                grayData[i / 4] = avg;
+            }
+
+            const threshold = currentEdgeThreshold; // Use the slider value
+
+            for (let y = 1; y < height - 1; y++) {
+                for (let x = 1; x < width - 1; x++) {
+                    const i = y * width + x;
+
+                    // Gx (horizontal gradient)
+                    const gx = (
+                        (-1 * grayData[i - width - 1]) + (0 * grayData[i - width]) + (1 * grayData[i - width + 1]) +
+                        (-2 * grayData[i - 1])     + (0 * grayData[i])         + (2 * grayData[i + 1]) +
+                        (-1 * grayData[i + width - 1]) + (0 * grayData[i + width]) + (1 * grayData[i + width + 1])
+                    );
+
+                    // Gy (vertical gradient)
+                    const gy = (
+                        (-1 * grayData[i - width - 1]) + (-2 * grayData[i - width]) + (-1 * grayData[i - width + 1]) +
+                        (0 * grayData[i - 1])         + (0 * grayData[i])         + (0 * grayData[i + 1]) +
+                        (1 * grayData[i + width - 1]) + (2 * grayData[i + width]) + (1 * grayData[i + width + 1])
+                    );
+
+                    const magnitude = Math.sqrt(gx * gx + gy * gy);
+
+                    const pixelIndex = i * 4;
+                    if (magnitude > threshold) {
+                        edgePixels[pixelIndex] = 0;     // Black (edge)
+                        edgePixels[pixelIndex + 1] = 0;
+                        edgePixels[pixelIndex + 2] = 0;
+                        edgePixels[pixelIndex + 3] = 255;
+                    } else {
+                        edgePixels[pixelIndex] = 255;   // White (no edge)
+                        edgePixels[pixelIndex + 1] = 255;
+                        edgePixels[pixelIndex + 2] = 255;
+                        edgePixels[pixelIndex + 3] = 255;
+                    }
+                }
+            }
+            edgeMapCtx.putImageData(edgeData, 0, 0);
+        }
+
+
+        // Event Listeners
+        imageUpload.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        originalImage = img;
+                        drawOriginalImage(); // Draw and then apply edge detection
+                    };
+                    img.onerror = () => {
+                        showMessageBox('Could not load image. Please try a different file.', 'error');
+                        resetApp();
+                    };
+                    img.src = event.target.result;
+                };
+                reader.onerror = () => {
+                    showMessageBox('Error reading file. Please try again.', 'error');
+                    resetApp();
+                };
+                reader.readAsDataURL(file);
+            } else {
+                resetApp();
+            }
+        });
+
+        edgeThresholdSlider.addEventListener('input', (e) => {
+            currentEdgeThreshold = parseInt(e.target.value, 10);
+            thresholdValueSpan.textContent = currentEdgeThreshold;
+            applyEdgeDetection(); // Re-apply edge detection with new threshold
+        });
+
+        applyEdgeDetectionButton.addEventListener('click', applyEdgeDetection);
+        resetButton.addEventListener('click', resetApp);
+
+        // Initial setup on window load
+        window.onload = () => {
+            resetApp(); // Ensure initial state is clean
+        };
+    </script>
+</body>
+</html>
