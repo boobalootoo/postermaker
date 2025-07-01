@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Image Region Averager</title>
+  <style>
+    body { font-family: sans-serif; text-align: center; }
+    canvas { border: 1px solid #333; margin-top: 10px; }
+    input[type="range"] { width: 300px; }
+  </style>
+</head>
+<body>
+  <h1>Upload Image & Group Similar Regions</h1>
+  <input type="file" id="fileInput" accept="image/*"><br><br>
+  <label>Color threshold: <span id="thresholdVal">30</span></label><br>
+  <input type="range" id="threshold" min="1" max="100" value="30"><br>
+  <canvas id="canvas"></canvas>
+
+  <script>
+    const fileInput = document.getElementById('fileInput');
+    const thresholdSlider = document.getElementById('threshold');
+    const thresholdVal = document.getElementById('thresholdVal');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+
+    let originalImageData;
+
+    fileInput.addEventListener('change', handleImage);
+    thresholdSlider.addEventListener('input', () => {
+      thresholdVal.textContent = thresholdSlider.value;
+      if (originalImageData) processImage();
+    });
+
+    function handleImage(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const img = new Image();
+      img.onload = function() {
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx.drawImage(img, 0, 0);
+        originalImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        processImage();
+      };
+      img.src = URL.createObjectURL(file);
+    }
+
+    function processImage() {
+      const imageData = new ImageData(new Uint8ClampedArray(originalImageData.data), originalImageData.width, originalImageData.height);
+      const data = imageData.data;
+      const width = imageData.width;
+      const height = imageData.height;
+      const threshold = parseInt(thresholdSlider.value);
+
+      const visited = new Array(width * height).fill(false);
+
+      function getColor(x, y) {
+        const idx = (y * width + x) * 4;
+        return [data[idx], data[idx+1], data[idx+2]];
+      }
+
+      function setColor(x, y, color) {
+        const idx = (y * width + x) * 4;
+        data[idx] = color[0];
+        data[idx+1] = color[1];
+        data[idx+2] = color[2];
+      }
+
+      function colorDistance(c1, c2) {
+        return Math.sqrt(
+          (c1[0] - c2[0]) ** 2 +
+          (c1[1] - c2[1]) ** 2 +
+          (c1[2] - c2[2]) ** 2
+        );
+      }
+
+      function floodFill(x, y, baseColor) {
+        const stack = [[x, y]];
+        let regionPixels = [];
+        let totalR = 0, totalG = 0, totalB = 0;
+
+        while (stack.length > 0) {
+          const [cx, cy] = stack.pop();
+          const idx = cy * width + cx;
+          if (visited[idx]) continue;
+          const currentColor = getColor(cx, cy);
+          if (colorDistance(currentColor, baseColor) > threshold) continue;
+
+          visited[idx] = true;
+          regionPixels.push([cx, cy]);
+          totalR += currentColor[0];
+          totalG += currentColor[1];
+          totalB += currentColor[2];
+
+          if (cx > 0) stack.push([cx - 1, cy]);
+          if (cx < width - 1) stack.push([cx + 1, cy]);
+          if (cy > 0) stack.push([cx, cy - 1]);
+          if (cy < height - 1) stack.push([cx, cy + 1]);
+        }
+
+        if (regionPixels.length === 0) return;
+
+        const avgColor = [
+          Math.round(totalR / regionPixels.length),
+          Math.round(totalG / regionPixels.length),
+          Math.round(totalB / regionPixels.length)
+        ];
+
+        for (const [px, py] of regionPixels) {
+          setColor(px, py, avgColor);
+        }
+      }
+
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          const idx = y * width + x;
+          if (!visited[idx]) {
+            const baseColor = getColor(x, y);
+            floodFill(x, y, baseColor);
+          }
+        }
+      }
+
+      ctx.putImageData(imageData, 0, 0);
+    }
+  </script>
+</body>
+</html>
