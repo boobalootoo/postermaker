@@ -1,0 +1,1042 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Cutter & Rearranger</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles for responsiveness and appearance */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f2f5;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start; /* Align to top to give more space for content */
+            padding: 1rem;
+            box-sizing: border-box; /* Include padding in element's total width and height */
+        }
+        .container {
+            background-color: #ffffff;
+            border-radius: 1rem;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            padding: 2rem;
+            max-width: 1200px;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            align-items: center;
+        }
+        .canvas-section {
+            display: flex;
+            flex-direction: column; /* Default to column for small screens */
+            gap: 1.5rem;
+            width: 100%;
+            justify-content: center;
+            align-items: flex-start; /* Align canvases at the top */
+        }
+
+        @media (min-width: 1024px) { /* On large screens, arrange side-by-side */
+            .canvas-section {
+                flex-direction: row;
+                align-items: flex-start; /* Align canvases at the top */
+            }
+        }
+
+        .canvas-wrapper {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%; /* Take full width on small screens */
+        }
+
+        canvas {
+            border: 2px solid #cbd5e1; /* slate-300 */
+            border-radius: 0.75rem; /* rounded-xl */
+            background-color: #f8fafc; /* slate-50 */
+            max-width: 100%;
+            height: auto; /* Maintain aspect ratio */
+            touch-action: none; /* Prevent browser touch actions like scrolling/zooming */
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+        }
+        #mainCanvas {
+            cursor: crosshair;
+        }
+        #arrangementCanvas {
+            background-color: #fff; /* Clear background for arrangement */
+            cursor: grab; /* Indicate draggable pieces */
+        }
+
+        .action-buttons button {
+            transition: background-color 0.2s ease, transform 0.1s ease;
+        }
+        .action-buttons button:hover {
+            transform: translateY(-2px);
+        }
+        .action-buttons button:active {
+            transform: translateY(0);
+        }
+        /* Message Box Styling */
+        .message-box {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: #fff;
+            padding: 20px 30px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            align-items: center;
+            text-align: center;
+            animation: fadeIn 0.3s ease-out;
+            max-width: 90%;
+        }
+
+        .message-box button {
+            padding: 8px 20px;
+            background-color: #4f46e5;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+
+        .message-box button:hover {
+            background-color: #4338ca;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translate(-50%, -60%); }
+            to { opacity: 1; transform: translate(-50%, -50%); }
+        }
+
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+        }
+        .info-panel {
+            background-color: #e0e7ff; /* indigo-100 */
+            border-radius: 0.5rem;
+            padding: 1rem;
+            max-height: 200px; /* Limit height */
+            overflow-y: auto; /* Make scrollable */
+            white-space: pre-wrap; /* Preserve whitespace and allow wrapping */
+            font-family: monospace;
+            font-size: 0.9em;
+            color: #312e81; /* indigo-900 */
+            border: 1px solid #a5b4fc; /* indigo-300 */
+        }
+        .info-panel h3 {
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+            color: #4338ca; /* indigo-700 */
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-center min-h-screen bg-gray-100 p-4">
+    <div class="container">
+        <h1 class="text-3xl font-bold text-gray-800 mb-4">Image Cutter & Rearranger</h1>
+
+        <!-- File Upload Section -->
+        <div class="w-full text-center mb-6">
+            <label for="imageUpload" class="block text-lg font-medium text-gray-700 mb-2">Upload an Image:</label>
+            <input type="file" id="imageUpload" accept="image/*" class="block w-full text-sm text-gray-500
+                file:mr-4 file:py-2 file:px-4
+                file:rounded-full file:border-0
+                file:text-sm file:font-semibold
+                file:bg-indigo-50 file:text-indigo-700
+                hover:file:bg-indigo-100"/>
+        </div>
+
+        <!-- Canvas Section -->
+        <div class="canvas-section lg:flex-row">
+            <div class="canvas-wrapper">
+                <h2 class="text-xl font-semibold text-gray-700 mb-2">Draw on Original Image:</h2>
+                <canvas id="mainCanvas"></canvas>
+            </div>
+            <div class="canvas-wrapper">
+                <h2 class="text-xl font-semibold text-gray-700 mb-2">Arrange Pieces Here:</h2>
+                <div class="flex items-center gap-4 mb-2">
+                    <label class="inline-flex items-center">
+                        <input type="checkbox" id="toggleBackground" class="form-checkbox text-indigo-600 h-5 w-5" checked>
+                        <span class="ml-2 text-gray-700">Show Original Background</span>
+                    </label>
+                    <div class="flex items-center">
+                        <label for="backgroundOpacity" class="mr-2 text-gray-700">Opacity:</label>
+                        <input type="range" id="backgroundOpacity" min="0" max="1" step="0.05" value="0.5" class="w-24">
+                        <span id="opacityValue" class="ml-2 text-gray-600">50%</span>
+                    </div>
+                    <button id="toggleDrawingMode" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-full shadow-md transition-all text-sm disabled:opacity-50 disabled:cursor-not-allowed">
+                        Enable Drawing
+                    </button>
+                </div>
+                <canvas id="arrangementCanvas"></canvas>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="action-buttons flex flex-wrap justify-center gap-4 mt-6 w-full">
+            <button id="cutButton" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-full shadow-lg transition-all text-lg disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                Cut Selected Area
+            </button>
+            <button id="saveAllButton" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-full shadow-lg transition-all text-lg disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                Save All Pieces
+            </button>
+             <button id="downloadArrangementButton" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-full shadow-lg transition-all text-lg disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                Download Arrangement
+            </button>
+            <button id="resetButton" class="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-full shadow-lg transition-all text-lg disabled:opacity-50 disabled:cursor-not-allowed">
+                Reset
+            </button>
+        </div>
+
+        <!-- Extracted Pieces Information Panel -->
+        <div class="w-full mt-8">
+            <h2 class="text-xl font-semibold text-gray-700 mb-4 text-center">Extracted Piece Information:</h2>
+            <div id="pieceInfoPanel" class="info-panel shadow-inner">
+                <p class="text-gray-500 text-center w-full">Cut a piece to see its SVG data and average color here.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Get references to DOM elements
+        const imageUpload = document.getElementById('imageUpload');
+        const mainCanvas = document.getElementById('mainCanvas');
+        const arrangementCanvas = document.getElementById('arrangementCanvas');
+        const cutButton = document.getElementById('cutButton');
+        const saveAllButton = document.getElementById('saveAllButton');
+        const downloadArrangementButton = document.getElementById('downloadArrangementButton');
+        const resetButton = document.getElementById('resetButton');
+        const pieceInfoPanel = document.getElementById('pieceInfoPanel');
+        const toggleBackground = document.getElementById('toggleBackground');
+        const backgroundOpacitySlider = document.getElementById('backgroundOpacity');
+        const opacityValueSpan = document.getElementById('opacityValue');
+        const toggleDrawingModeButton = document.getElementById('toggleDrawingMode');
+
+        const mainCtx = mainCanvas.getContext('2d');
+        const arrangementCtx = arrangementCanvas.getContext('2d');
+
+        // Global variables for image and drawing state on mainCanvas
+        let originalImage = null;
+        let drawingMain = false;
+        let currentMainPath = []; // Stores points for the current drawing path on mainCanvas (scaled coords)
+        let allMainPaths = [];    // Stores all completed paths (scaled coords)
+
+        // Global variables for arrangementCanvas
+        let showOriginalBackground = true;
+        let backgroundOpacity = 0.5;
+        let drawingArrangement = false; // New state for drawing on arrangement canvas
+        let currentArrangementPath = [];
+        let allArrangementPaths = [];
+
+        // Stores all extracted pieces for arrangement, each object contains:
+        // { id: uniqueId, imageDataUrl: string, imageObject: Image,
+        //   originalPath: Array<Object>, averageColor: string, x: number, y: number, width: number, height: number }
+        let extractedPiecesData = [];
+
+        // Variables for drag-and-drop on arrangementCanvas
+        let draggedPieceId = null; // ID of the piece currently being dragged
+        let dragOffsetX, dragOffsetY; // Offset from mouse/touch to piece's top-left corner
+
+        const SNAPPING_THRESHOLD = 20; // Pixels for snapping
+
+        /**
+         * Displays a custom message box to the user instead of alert().
+         * @param {string} message - The message to display.
+         * @param {string} type - Type of message (e.g., 'info', 'error').
+         * @returns {Promise<void>} - A promise that resolves when the message box is closed.
+         */
+        function showMessageBox(message, type = 'info') {
+            return new Promise(resolve => {
+                // Create overlay to dim background
+                const overlay = document.createElement('div');
+                overlay.className = 'overlay';
+                document.body.appendChild(overlay);
+
+                // Create message box
+                const messageBox = document.createElement('div');
+                messageBox.className = 'message-box';
+                messageBox.innerHTML = `
+                    <p class="text-lg font-medium">${message}</p>
+                    <button id="messageBoxOkButton" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded">OK</button>
+                `;
+                document.body.appendChild(messageBox);
+
+                // Add event listener to OK button
+                const okButton = document.getElementById('messageBoxOkButton');
+                okButton.onclick = () => {
+                    document.body.removeChild(messageBox);
+                    document.body.removeChild(overlay);
+                    resolve();
+                };
+            });
+        }
+
+
+        /**
+         * Resets the application to its initial state.
+         */
+        function resetApp() {
+            originalImage = null;
+            drawingMain = false;
+            currentMainPath = [];
+            allMainPaths = [];
+            extractedPiecesData = [];
+            drawingArrangement = false;
+            currentArrangementPath = [];
+            allArrangementPaths = [];
+            showOriginalBackground = true;
+            backgroundOpacity = 0.5;
+
+            // Update UI elements for reset
+            toggleBackground.checked = true;
+            backgroundOpacitySlider.value = 0.5;
+            opacityValueSpan.textContent = '50%';
+            toggleDrawingModeButton.textContent = 'Enable Drawing';
+            arrangementCanvas.style.cursor = 'grab'; // Reset cursor
+
+            // Clear canvases
+            mainCtx.clearRect(0, 0, mainCanvas.width, mainCanvas.height);
+            mainCanvas.width = 0;
+            mainCanvas.height = 0;
+
+            arrangementCtx.clearRect(0, 0, arrangementCanvas.width, arrangementCanvas.height);
+            arrangementCanvas.width = 0;
+            arrangementCanvas.height = 0;
+
+            pieceInfoPanel.innerHTML = '<p class="text-gray-500 text-center w-full">Cut a piece to see its SVG data and average color here.</p>';
+            
+            cutButton.disabled = true;
+            saveAllButton.disabled = true;
+            downloadArrangementButton.disabled = true;
+            imageUpload.value = ''; // Clear file input
+            showMessageBox('Application reset successfully!', 'info');
+        }
+
+        /**
+         * Draws the original image onto the main canvas, scaling to fit.
+         * Sets up the arrangement canvas to match original image dimensions.
+         */
+        function setupCanvases() {
+            if (!originalImage) return;
+
+            // --- Main Canvas (for drawing) ---
+            const maxWidth = mainCanvas.parentElement.clientWidth;
+            const maxHeight = window.innerHeight * 0.5; // Max 50% of viewport height for one canvas
+
+            let scaledWidth = originalImage.width;
+            let scaledHeight = originalImage.height;
+
+            // Scale down if image is too large for drawing canvas
+            if (scaledWidth > maxWidth) {
+                scaledHeight = (scaledHeight / scaledWidth) * maxWidth;
+                scaledWidth = maxWidth;
+            }
+            if (scaledHeight > maxHeight) {
+                scaledWidth = (scaledWidth / scaledHeight) * maxHeight;
+                scaledHeight = maxHeight;
+            }
+
+            mainCanvas.width = scaledWidth;
+            mainCanvas.height = scaledHeight;
+            mainCtx.clearRect(0, 0, mainCanvas.width, mainCanvas.height);
+            mainCtx.drawImage(originalImage, 0, 0, mainCanvas.width, mainCanvas.height);
+            mainCtx.strokeStyle = '#4f46e5'; // Indigo-600 for drawing
+            mainCtx.lineWidth = 3;
+            mainCtx.lineJoin = 'round';
+            mainCtx.lineCap = 'round';
+            mainCtx.globalAlpha = 0.7; // Slightly transparent drawing
+
+            // --- Arrangement Canvas ---
+            // This canvas should match the original image's dimensions for accurate placement of pieces
+            arrangementCanvas.width = originalImage.width;
+            arrangementCanvas.height = originalImage.height;
+            
+            // Ensure arrangement canvas is visible for drag-and-drop
+            if (originalImage.width > 0 && originalImage.height > 0) {
+                 downloadArrangementButton.disabled = false;
+            } else {
+                 downloadArrangementButton.disabled = true;
+            }
+            redrawArrangementCanvas(); // Initial draw of arrangement canvas
+        }
+
+        /**
+         * Redraws all completed paths on the main canvas.
+         */
+        function redrawMainCanvasPaths() {
+            mainCtx.clearRect(0, 0, mainCanvas.width, mainCanvas.height); // Clear canvas
+            mainCtx.drawImage(originalImage, 0, 0, mainCanvas.width, mainCanvas.height); // Redraw original image
+
+            mainCtx.beginPath();
+            allMainPaths.forEach(path => {
+                if (path.length > 0) {
+                    mainCtx.moveTo(path[0].x, path[0].y);
+                    for (let i = 1; i < path.length; i++) {
+                        mainCtx.lineTo(path[i].x, path[i].y);
+                    }
+                    if (path.length > 2) { // Close path if it's a polygon
+                        mainCtx.lineTo(path[0].x, path[0].y); // Close path to starting point
+                    }
+                }
+            });
+            mainCtx.stroke();
+        }
+
+        /**
+         * Redraws all extracted pieces and drawings on the arrangement canvas.
+         */
+        function redrawArrangementCanvas() {
+            arrangementCtx.clearRect(0, 0, arrangementCanvas.width, arrangementCanvas.height);
+
+            // 1. Draw original image background if enabled
+            if (originalImage && showOriginalBackground) {
+                arrangementCtx.save();
+                arrangementCtx.globalAlpha = backgroundOpacity;
+                arrangementCtx.drawImage(originalImage, 0, 0, arrangementCanvas.width, arrangementCanvas.height);
+                arrangementCtx.restore();
+            } else if (extractedPiecesData.length === 0 && allArrangementPaths.length === 0 && originalImage) {
+                // Only show message if no pieces/drawings and no background
+                arrangementCtx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+                arrangementCtx.font = '20px Inter';
+                arrangementCtx.textAlign = 'center';
+                arrangementCtx.fillText('Arrange pieces or draw here', arrangementCanvas.width / 2, arrangementCanvas.height / 2);
+            }
+
+
+            // 2. Draw extracted pieces
+            extractedPiecesData.forEach(piece => {
+                if (piece.imageObject && piece.x !== undefined && piece.y !== undefined) {
+                    arrangementCtx.drawImage(piece.imageObject, piece.x, piece.y, piece.width, piece.height);
+                }
+            });
+
+            // 3. Draw paths drawn on arrangement canvas
+            arrangementCtx.strokeStyle = '#8b5cf6'; // Purple-600 for arrangement drawing
+            arrangementCtx.lineWidth = 3;
+            arrangementCtx.lineJoin = 'round';
+            arrangementCtx.lineCap = 'round';
+            arrangementCtx.globalAlpha = 0.8; // Slightly transparent drawing
+            allArrangementPaths.forEach(path => {
+                if (path.length > 0) {
+                    arrangementCtx.beginPath();
+                    arrangementCtx.moveTo(path[0].x, path[0].y);
+                    for (let i = 1; i < path.length; i++) {
+                        arrangementCtx.lineTo(path[i].x, path[i].y);
+                    }
+                    arrangementCtx.stroke();
+                }
+            });
+            arrangementCtx.globalAlpha = 1.0; // Reset alpha
+        }
+
+        /**
+         * Handles image file selection and loads it onto the canvas.
+         * @param {Event} e - The file input change event.
+         */
+        imageUpload.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        originalImage = img;
+                        setupCanvases(); // Setup both canvases
+                        cutButton.disabled = false;
+                        saveAllButton.disabled = false;
+                        resetButton.disabled = false;
+                        pieceInfoPanel.innerHTML = '<p class="text-gray-500 text-center w-full">Cut a piece to see its SVG data and average color here.</p>';
+                    };
+                    img.onerror = () => {
+                        showMessageBox('Could not load image. Please try a different file.', 'error');
+                        resetApp();
+                    };
+                    img.src = event.target.result;
+                };
+                reader.onerror = () => {
+                    showMessageBox('Error reading file. Please try again.', 'error');
+                    resetApp();
+                };
+                reader.readAsDataURL(file);
+            } else {
+                // If no file is selected, effectively reset state related to image
+                resetApp();
+            }
+        });
+
+        /**
+         * Gets the mouse/touch coordinates relative to the canvas.
+         * @param {Event} event - The mouse or touch event.
+         * @param {HTMLCanvasElement} canvas - The canvas element to get coordinates from.
+         * @returns {Object} - An object with x and y coordinates.
+         */
+        function getCanvasCoordinates(event, canvas) {
+            const rect = canvas.getBoundingClientRect();
+            let clientX, clientY;
+
+            // Check if it's a touch event
+            if (event.touches && event.touches.length > 0) {
+                clientX = event.touches[0].clientX;
+                clientY = event.touches[0].clientY;
+            } else {
+                clientX = event.clientX;
+                clientY = event.clientY;
+            }
+
+            return {
+                x: (clientX - rect.left) * (canvas.width / rect.width),
+                y: (clientY - rect.top) * (canvas.height / rect.height)
+            };
+        }
+
+        /**
+         * Converts scaled canvas coordinates to original image coordinates.
+         * @param {Object} scaledCoords - {x, y} coordinates on the scaled canvas.
+         * @returns {Object} - {x, y} coordinates on the original image.
+         */
+        function toOriginalImageCoords(scaledCoords) {
+            if (!originalImage || !mainCanvas.width || !mainCanvas.height) {
+                return scaledCoords;
+            }
+            const scaleX = originalImage.width / mainCanvas.width;
+            const scaleY = originalImage.height / mainCanvas.height;
+            return {
+                x: scaledCoords.x * scaleX,
+                y: scaledCoords.y * scaleY
+            };
+        }
+
+        /**
+         * Starts drawing on the main canvas.
+         * @param {Event} e - The mouse or touch event.
+         */
+        function startDrawingMain(e) {
+            if (!originalImage) {
+                showMessageBox('Please upload an image first!', 'error');
+                return;
+            }
+            drawingMain = true;
+            currentMainPath = []; // Start a new path
+            const coords = getCanvasCoordinates(e, mainCanvas);
+            currentMainPath.push(coords);
+            mainCtx.beginPath();
+            mainCtx.moveTo(coords.x, coords.y);
+            e.preventDefault(); // Prevent default touch behavior (scrolling, zooming)
+        }
+
+        /**
+         * Continues drawing on the main canvas.
+         * @param {Event} e - The mouse or touch event.
+         */
+        function drawMain(e) {
+            if (!drawingMain) return;
+            const coords = getCanvasCoordinates(e, mainCanvas);
+            currentMainPath.push(coords);
+            mainCtx.lineTo(coords.x, coords.y);
+            mainCtx.stroke();
+            e.preventDefault();
+        }
+
+        /**
+         * Ends drawing on the main canvas and closes the path.
+         */
+        function endDrawingMain() {
+            if (!drawingMain) return;
+            drawingMain = false;
+
+            // If the path has at least 3 points, close it to form a shape
+            if (currentMainPath.length > 2) {
+                mainCtx.lineTo(currentMainPath[0].x, currentMainPath[0].y); // Connect last point to first
+                mainCtx.stroke(); // Draw the closing line
+                allMainPaths.push([...currentMainPath]); // Store a copy of the completed path
+                // Show a temporary visual indication that path is closed, e.g., fill it briefly
+                mainCtx.save();
+                mainCtx.fillStyle = 'rgba(79, 70, 229, 0.2)'; // Faint indigo fill
+                mainCtx.fill();
+                mainCtx.restore();
+            } else {
+                // If path is too short to form a shape, discard it visually
+                showMessageBox('Please draw a path with at least 3 points to form a cuttable shape.', 'info');
+                redrawMainCanvasPaths(); // Clear incomplete drawing
+            }
+        }
+
+        // Mouse events for drawing on main canvas
+        mainCanvas.addEventListener('mousedown', startDrawingMain);
+        mainCanvas.addEventListener('mousemove', drawMain);
+        mainCanvas.addEventListener('mouseup', endDrawingMain);
+        mainCanvas.addEventListener('mouseout', () => {
+            // End drawing if mouse leaves canvas, but only if a path was being drawn
+            if (drawingMain) {
+                endDrawingMain();
+            }
+        });
+
+        // Touch events for drawing on main canvas
+        mainCanvas.addEventListener('touchstart', startDrawingMain);
+        mainCanvas.addEventListener('touchmove', drawMain);
+        mainCanvas.addEventListener('touchend', endDrawingMain);
+        mainCanvas.addEventListener('touchcancel', endDrawingMain); // Handle touch being cancelled
+
+
+        /**
+         * Extracts the image region defined by the last drawn path, calculates average color,
+         * and prepares data for SVG recreation.
+         */
+        cutButton.addEventListener('click', async () => {
+            if (!originalImage || allMainPaths.length === 0) {
+                showMessageBox('Please upload an image and draw a path first!', 'error');
+                return;
+            }
+
+            const path = allMainPaths.pop(); // Take the last drawn path (scaled coordinates)
+            if (path.length < 3) {
+                showMessageBox('Cannot cut. A valid closed shape requires at least 3 points.', 'error');
+                redrawMainCanvasPaths();
+                return;
+            }
+
+            // Create a temporary offscreen canvas for clipping
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = mainCanvas.width;
+            tempCanvas.height = mainCanvas.height;
+            const tempCtx = tempCanvas.getContext('2d');
+
+            // Draw the path as a clipping mask
+            tempCtx.beginPath();
+            tempCtx.moveTo(path[0].x, path[0].y);
+            for (let i = 1; i < path.length; i++) {
+                tempCtx.lineTo(path[i].x, path[i].y);
+            }
+            tempCtx.closePath();
+            tempCtx.clip(); // Apply the clipping mask
+
+            // Draw the original image within the clipped region (scaled version)
+            tempCtx.drawImage(originalImage, 0, 0, tempCanvas.width, tempCanvas.height);
+
+            // Get the bounding box of the drawn path to crop the extracted image
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+            path.forEach(p => {
+                minX = Math.min(minX, p.x);
+                minY = Math.min(minY, p.y);
+                maxX = Math.max(maxX, p.x);
+                maxY = Math.max(maxY, p.y);
+            });
+
+            // Add some padding to the bounding box to ensure the full clipped shape is captured
+            const padding = 5; // Pixels
+            minX = Math.max(0, minX - padding);
+            minY = Math.max(0, minY - padding);
+            maxX = Math.min(tempCanvas.width, maxX + padding);
+            maxY = Math.min(tempCanvas.height, maxY + padding);
+
+            const width = maxX - minX;
+            const height = maxY - minY;
+
+            if (width <= 0 || height <= 0) {
+                showMessageBox('The drawn shape is too small or invalid for cutting.', 'error');
+                redrawMainCanvasPaths();
+                return;
+            }
+
+            // Create another temporary canvas for the final cropped piece
+            const finalPieceCanvas = document.createElement('canvas');
+            finalPieceCanvas.width = width;
+            finalPieceCanvas.height = height;
+            const finalPieceCtx = finalPieceCanvas.getContext('2d');
+
+            // Draw the clipped image from the first temp canvas onto the final piece canvas, cropped
+            finalPieceCtx.drawImage(tempCanvas, minX, minY, width, height, 0, 0, width, height);
+
+            const pieceDataUrl = finalPieceCanvas.toDataURL('image/png');
+
+            // Calculate average color
+            const imageData = finalPieceCtx.getImageData(0, 0, width, height).data;
+            let r = 0, g = 0, b = 0, a = 0;
+            let pixelCount = 0;
+            for (let i = 0; i < imageData.length; i += 4) {
+                if (imageData[i + 3] > 0) { // Only count non-transparent pixels
+                    r += imageData[i];
+                    g += imageData[i + 1];
+                    b += imageData[i + 2];
+                    a += imageData[i + 3];
+                    pixelCount++;
+                }
+            }
+            const avgR = pixelCount > 0 ? Math.floor(r / pixelCount) : 0;
+            const avgG = pixelCount > 0 ? Math.floor(g / pixelCount) : 0;
+            const avgB = pixelCount > 0 ? Math.floor(b / pixelCount) : 0;
+            const avgA = pixelCount > 0 ? (a / pixelCount / 255).toFixed(2) : 0; // Normalize alpha to 0-1
+
+            const averageColor = `rgba(${avgR}, ${avgG}, ${avgB}, ${avgA})`;
+
+            // Convert scaled path to original image coordinates for SVG recreation
+            const originalCoordsPath = path.map(p => toOriginalImageCoords(p));
+
+            // Load the piece image for efficient drawing on arrangementCanvas
+            const pieceImageObject = new Image();
+            pieceImageObject.src = pieceDataUrl;
+            await new Promise(resolve => pieceImageObject.onload = resolve); // Ensure image is loaded
+
+            const pieceId = 'piece-' + Date.now(); // Unique ID for the piece
+
+            // Calculate initial position on arrangement canvas based on original image coordinates
+            const initialX = toOriginalImageCoords({ x: minX, y: minY }).x;
+            const initialY = toOriginalImageCoords({ x: minX, y: minY }).y;
+
+            const newPieceData = {
+                id: pieceId,
+                imageDataUrl: pieceDataUrl,
+                imageObject: pieceImageObject,
+                originalPath: originalCoordsPath,
+                averageColor: averageColor,
+                x: initialX, // Initial position on arrangement canvas
+                y: initialY,
+                width: pieceImageObject.width,
+                height: pieceImageObject.height
+            };
+
+            extractedPiecesData.push(newPieceData);
+            displayPieceInfo(newPieceData);
+            redrawMainCanvasPaths(); // Redraw main canvas without the just-cut path
+            redrawArrangementCanvas(); // Redraw arrangement canvas with new piece
+
+            showMessageBox('Piece cut successfully! It has been placed on the arrangement canvas.', 'info');
+        });
+
+        /**
+         * Displays extracted piece information in the info panel.
+         * @param {Object} pieceData - The data for the extracted piece.
+         */
+        function displayPieceInfo(pieceData) {
+            // Remove the initial instruction message if pieces are being added
+            const initialMessage = pieceInfoPanel.querySelector('p.text-gray-500');
+            if (initialMessage) {
+                pieceInfoPanel.removeChild(initialMessage);
+            }
+
+            const infoDiv = document.createElement('div');
+            infoDiv.className = 'bg-white rounded-md p-3 mb-3 shadow-sm border border-indigo-200'; // No drag functionality here
+            infoDiv.id = `info-${pieceData.id}`;
+
+            let pathSvgString = '';
+            if (pieceData.originalPath && pieceData.originalPath.length > 0) {
+                pathSvgString = `M ${pieceData.originalPath[0].x} ${pieceData.originalPath[0].y}`;
+                for (let i = 1; i < pieceData.originalPath.length; i++) {
+                    pathSvgString += ` L ${pieceData.originalPath[i].x} ${pieceData.originalPath[i].y}`;
+                }
+                pathSvgString += ' Z'; // Close path
+            }
+
+            infoDiv.innerHTML = `
+                <h4 class="font-semibold text-indigo-800">Piece ID: ${pieceData.id.split('-')[1]}</h4>
+                <p><strong>Avg Color:</strong> <span style="background-color: ${pieceData.averageColor}; padding: 2px 5px; border-radius: 3px;">${pieceData.averageColor}</span></p>
+                <p><strong>Original Coords:</strong> (Relative to original image)</p>
+                <code class="block overflow-auto text-xs max-h-20">${pathSvgString}</code>
+            `;
+            pieceInfoPanel.appendChild(infoDiv);
+        }
+
+        /**
+         * Applies snapping logic to a dragged piece.
+         * @param {Object} currentPiece - The piece being snapped.
+         */
+        function applySnapping(currentPiece) {
+            extractedPiecesData.forEach(otherPiece => {
+                if (currentPiece.id === otherPiece.id) return; // Don't snap to itself
+
+                // Check horizontal snapping
+                // Snap left edge of current to right edge of other
+                if (Math.abs(currentPiece.x - (otherPiece.x + otherPiece.width)) < SNAPPING_THRESHOLD) {
+                    currentPiece.x = otherPiece.x + otherPiece.width;
+                }
+                // Snap right edge of current to left edge of other
+                else if (Math.abs((currentPiece.x + currentPiece.width) - otherPiece.x) < SNAPPING_THRESHOLD) {
+                    currentPiece.x = otherPiece.x - currentPiece.width;
+                }
+                // Snap left edge of current to left edge of other
+                else if (Math.abs(currentPiece.x - otherPiece.x) < SNAPPING_THRESHOLD) {
+                    currentPiece.x = otherPiece.x;
+                }
+                // Snap right edge of current to right edge of other
+                else if (Math.abs((currentPiece.x + currentPiece.width) - (otherPiece.x + otherPiece.width)) < SNAPPING_THRESHOLD) {
+                    currentPiece.x = otherPiece.x + otherPiece.width - currentPiece.width;
+                }
+
+
+                // Check vertical snapping
+                // Snap top edge of current to bottom edge of other
+                if (Math.abs(currentPiece.y - (otherPiece.y + otherPiece.height)) < SNAPPING_THRESHOLD) {
+                    currentPiece.y = otherPiece.y + otherPiece.height;
+                }
+                // Snap bottom edge of current to top edge of other
+                else if (Math.abs((currentPiece.y + currentPiece.height) - otherPiece.y) < SNAPPING_THRESHOLD) {
+                    currentPiece.y = otherPiece.y - currentPiece.height;
+                }
+                // Snap top edge of current to top edge of other
+                else if (Math.abs(currentPiece.y - otherPiece.y) < SNAPPING_THRESHOLD) {
+                    currentPiece.y = otherPiece.y;
+                }
+                // Snap bottom edge of current to bottom edge of other
+                else if (Math.abs((currentPiece.y + currentPiece.height) - (otherPiece.y + otherPiece.height)) < SNAPPING_THRESHOLD) {
+                    currentPiece.y = otherPiece.y + otherPiece.height - currentPiece.height;
+                }
+            });
+
+            // Boundary snapping (optional, but good for keeping pieces on canvas)
+            currentPiece.x = Math.max(0, Math.min(currentPiece.x, arrangementCanvas.width - currentPiece.width));
+            currentPiece.y = Math.max(0, Math.min(currentPiece.y, arrangementCanvas.height - currentPiece.height));
+        }
+
+        // --- Arrangement Canvas Interaction (Drag Pieces or Draw) ---
+
+        /**
+         * Starts interaction on the arrangement canvas (either drag or draw).
+         * @param {Event} e - The mouse or touch event.
+         */
+        function startArrangementInteraction(e) {
+            if (!originalImage) {
+                showMessageBox('Please upload an image first!', 'error');
+                return;
+            }
+
+            const coords = getCanvasCoordinates(e, arrangementCanvas);
+
+            if (!drawingArrangement) { // If not in drawing mode, try to drag a piece
+                // Iterate through pieces in reverse order to pick the topmost one
+                for (let i = extractedPiecesData.length - 1; i >= 0; i--) {
+                    const piece = extractedPiecesData[i];
+                    if (coords.x >= piece.x && coords.x <= piece.x + piece.width &&
+                        coords.y >= piece.y && coords.y <= piece.y + piece.height) {
+                        
+                        draggedPieceId = piece.id;
+                        // Move the dragged piece to the end of the array to draw it on top
+                        extractedPiecesData.splice(i, 1);
+                        extractedPiecesData.push(piece);
+
+                        dragOffsetX = coords.x - piece.x;
+                        dragOffsetY = coords.y - piece.y;
+                        arrangementCanvas.style.cursor = 'grabbing';
+                        e.preventDefault(); // Prevent default touch behavior (scrolling, zooming)
+                        return; // A piece was found, so don't initiate drawing
+                    }
+                }
+            }
+
+            // If no piece was clicked or if in drawing mode, start drawing
+            drawingArrangement = true;
+            currentArrangementPath = []; // Start a new path
+            currentArrangementPath.push(coords);
+            arrangementCtx.beginPath();
+            arrangementCtx.moveTo(coords.x, coords.y);
+            arrangementCanvas.style.cursor = 'crosshair'; // Change cursor to crosshair
+            e.preventDefault();
+        }
+
+        /**
+         * Continues interaction on the arrangement canvas (either drag or draw).
+         * @param {Event} e - The mouse or touch event.
+         */
+        function duringArrangementInteraction(e) {
+            if (draggedPieceId) { // If dragging a piece
+                const piece = extractedPiecesData.find(p => p.id === draggedPieceId);
+                if (piece) {
+                    const coords = getCanvasCoordinates(e, arrangementCanvas);
+                    piece.x = coords.x - dragOffsetX;
+                    piece.y = coords.y - dragOffsetY;
+                    redrawArrangementCanvas(); // Redraw frequently during drag
+                }
+            } else if (drawingArrangement) { // If drawing
+                const coords = getCanvasCoordinates(e, arrangementCanvas);
+                currentArrangementPath.push(coords);
+                arrangementCtx.lineTo(coords.x, coords.y);
+                arrangementCtx.stroke();
+            }
+            e.preventDefault();
+        }
+
+        /**
+         * Ends interaction on the arrangement canvas (either drag or draw).
+         */
+        function endArrangementInteraction() {
+            if (draggedPieceId) { // If dragging a piece
+                const piece = extractedPiecesData.find(p => p.id === draggedPieceId);
+                if (piece) {
+                    applySnapping(piece); // Apply snapping once dragging ends
+                    redrawArrangementCanvas();
+                }
+                draggedPieceId = null;
+                arrangementCanvas.style.cursor = drawingArrangement ? 'crosshair' : 'grab'; // Reset cursor
+            } else if (drawingArrangement) { // If drawing
+                if (currentArrangementPath.length > 0) {
+                    allArrangementPaths.push([...currentArrangementPath]); // Store completed path
+                }
+                drawingArrangement = false; // Stop drawing
+                redrawArrangementCanvas(); // Redraw to finalize path
+                arrangementCanvas.style.cursor = 'crosshair'; // Keep crosshair if still in drawing mode
+            }
+        }
+
+        // Mouse events for arrangement canvas
+        arrangementCanvas.addEventListener('mousedown', startArrangementInteraction);
+        arrangementCanvas.addEventListener('mousemove', duringArrangementInteraction);
+        arrangementCanvas.addEventListener('mouseup', endArrangementInteraction);
+        arrangementCanvas.addEventListener('mouseleave', () => {
+             if (draggedPieceId) { // If dragging a piece and mouse leaves canvas
+                const piece = extractedPiecesData.find(p => p.id === draggedPieceId);
+                if (piece) {
+                    applySnapping(piece);
+                    redrawArrangementCanvas();
+                }
+                draggedPieceId = null;
+                arrangementCanvas.style.cursor = drawingArrangement ? 'crosshair' : 'grab';
+            } else if (drawingArrangement) { // If drawing and mouse leaves canvas
+                endArrangementInteraction(); // End drawing
+            }
+        });
+
+        // Touch events for arrangement canvas
+        arrangementCanvas.addEventListener('touchstart', startArrangementInteraction, { passive: false });
+        arrangementCanvas.addEventListener('touchmove', duringArrangementInteraction, { passive: false });
+        arrangementCanvas.addEventListener('touchend', endArrangementInteraction);
+        arrangementCanvas.addEventListener('touchcancel', endArrangementInteraction);
+
+
+        // --- UI Control Event Listeners ---
+
+        // Toggle Background Visibility
+        toggleBackground.addEventListener('change', () => {
+            showOriginalBackground = toggleBackground.checked;
+            redrawArrangementCanvas();
+        });
+
+        // Background Opacity Slider
+        backgroundOpacitySlider.addEventListener('input', () => {
+            backgroundOpacity = parseFloat(backgroundOpacitySlider.value);
+            opacityValueSpan.textContent = `${Math.round(backgroundOpacity * 100)}%`;
+            redrawArrangementCanvas();
+        });
+
+        // Toggle Drawing Mode on Arrangement Canvas
+        toggleDrawingModeButton.addEventListener('click', () => {
+            drawingArrangement = !drawingArrangement;
+            if (drawingArrangement) {
+                toggleDrawingModeButton.textContent = 'Disable Drawing';
+                arrangementCanvas.style.cursor = 'crosshair';
+                showMessageBox('Drawing mode enabled on arrangement canvas. Click and drag to draw lines.', 'info');
+            } else {
+                toggleDrawingModeButton.textContent = 'Enable Drawing';
+                arrangementCanvas.style.cursor = 'grab'; // Revert to grab for moving pieces
+                showMessageBox('Drawing mode disabled on arrangement canvas. You can now drag pieces again.', 'info');
+            }
+        });
+
+        /**
+         * Saves all extracted pieces as individual PNG files.
+         */
+        saveAllButton.addEventListener('click', () => {
+            if (extractedPiecesData.length === 0) {
+                showMessageBox('No pieces to save! Please cut some pieces first.', 'error');
+                return;
+            }
+
+            extractedPiecesData.forEach((pieceData, index) => {
+                const link = document.createElement('a');
+                link.href = pieceData.imageDataUrl;
+                link.download = `cut_piece_${index + 1}.png`;
+                document.body.appendChild(link); // Append to body to make it clickable
+                link.click(); // Programmatically click the link to trigger download
+                document.body.removeChild(link); // Remove after click
+            });
+            showMessageBox('All pieces saved successfully!', 'info');
+        });
+
+        /**
+         * Downloads the current content of the arrangement canvas as a PNG.
+         */
+        downloadArrangementButton.addEventListener('click', () => {
+            if (!originalImage || (extractedPiecesData.length === 0 && allArrangementPaths.length === 0 && !showOriginalBackground)) {
+                showMessageBox('Nothing to download. Please upload an image, arrange pieces, or draw.', 'error');
+                return;
+            }
+            if (arrangementCanvas.width === 0 || arrangementCanvas.height === 0) {
+                showMessageBox('Arrangement canvas is not ready. Please upload an image first.', 'error');
+                return;
+            }
+
+            // Create a temporary canvas to render everything for download
+            const downloadCanvas = document.createElement('canvas');
+            downloadCanvas.width = arrangementCanvas.width;
+            downloadCanvas.height = arrangementCanvas.height;
+            const downloadCtx = downloadCanvas.getContext('2d');
+
+            // Draw original background if enabled
+            if (originalImage && showOriginalBackground) {
+                downloadCtx.save();
+                downloadCtx.globalAlpha = backgroundOpacity;
+                downloadCtx.drawImage(originalImage, 0, 0, downloadCanvas.width, downloadCanvas.height);
+                downloadCtx.restore();
+            }
+
+            // Draw extracted pieces
+            extractedPiecesData.forEach(piece => {
+                if (piece.imageObject && piece.x !== undefined && piece.y !== undefined) {
+                    downloadCtx.drawImage(piece.imageObject, piece.x, piece.y, piece.width, piece.height);
+                }
+            });
+
+            // Draw paths drawn on arrangement canvas
+            downloadCtx.strokeStyle = '#8b5cf6'; // Purple-600 for arrangement drawing
+            downloadCtx.lineWidth = 3;
+            downloadCtx.lineJoin = 'round';
+            downloadCtx.lineCap = 'round';
+            downloadCtx.globalAlpha = 0.8;
+            allArrangementPaths.forEach(path => {
+                if (path.length > 0) {
+                    downloadCtx.beginPath();
+                    downloadCtx.moveTo(path[0].x, path[0].y);
+                    for (let i = 1; i < path.length; i++) {
+                        downloadCtx.lineTo(path[i].x, path[i].y);
+                    }
+                    downloadCtx.stroke();
+                }
+            });
+            downloadCtx.globalAlpha = 1.0; // Reset alpha
+
+            const link = document.createElement('a');
+            link.href = downloadCanvas.toDataURL('image/png');
+            link.download = 'arranged_image.png';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            showMessageBox('Arranged image downloaded successfully!', 'info');
+        });
+
+
+        // Reset Button Event Listener
+        resetButton.addEventListener('click', resetApp);
+
+        // Initial setup on window load
+        window.onload = () => {
+            resetApp(); // Ensure initial state is clean and buttons are disabled
+        };
+    </script>
+</body>
+</html>
