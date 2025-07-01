@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Pixel Hex CSV Exporter</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles for responsiveness and appearance */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f2f5;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            padding: 1rem;
+            box-sizing: border-box;
+        }
+        .container {
+            background-color: #ffffff;
+            border-radius: 1rem;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            padding: 2rem;
+            max-width: 800px;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            align-items: center;
+        }
+        .canvas-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+        }
+
+        canvas {
+            border: 2px solid #cbd5e1; /* slate-300 */
+            border-radius: 0.75rem; /* rounded-xl */
+            background-color: #f8fafc; /* slate-50 */
+            max-width: 100%;
+            height: auto; /* Maintain aspect ratio */
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+        }
+
+        /* Message Box Styling */
+        .message-box {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: #fff;
+            padding: 20px 30px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            align-items: center;
+            text-align: center;
+            animation: fadeIn 0.3s ease-out;
+            max-width: 90%;
+        }
+
+        .message-box button {
+            padding: 8px 20px;
+            background-color: #4f46e5;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+
+        .message-box button:hover {
+            background-color: #4338ca;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translate(-50%, -60%); }
+            to { opacity: 1; transform: translate(-50%, -50%); }
+        }
+
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-center min-h-screen bg-gray-100 p-4">
+    <div class="container">
+        <h1 class="text-3xl font-bold text-gray-800 mb-4">Image Pixel Hex CSV Exporter</h1>
+
+        <!-- File Upload Section -->
+        <div class="w-full text-center mb-6">
+            <label for="imageUpload" class="block text-lg font-medium text-gray-700 mb-2">Upload an Image:</label>
+            <input type="file" id="imageUpload" accept="image/*" class="block w-full text-sm text-gray-500
+                file:mr-4 file:py-2 file:px-4
+                file:rounded-full file:border-0
+                file:text-sm file:font-semibold
+                file:bg-indigo-50 file:text-indigo-700
+                hover:file:bg-indigo-100"/>
+        </div>
+
+        <!-- Canvas Section -->
+        <div class="canvas-wrapper">
+            <h2 class="text-xl font-semibold text-gray-700 mb-2">Uploaded Image:</h2>
+            <canvas id="imageCanvas"></canvas>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="action-buttons flex flex-wrap justify-center gap-4 mt-6 w-full">
+            <button id="generateCsvButton" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-full shadow-lg transition-all text-lg disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                Generate CSV
+            </button>
+            <button id="resetButton" class="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-full shadow-lg transition-all text-lg">
+                Reset
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Get references to DOM elements
+        const imageUpload = document.getElementById('imageUpload');
+        const imageCanvas = document.getElementById('imageCanvas');
+        const generateCsvButton = document.getElementById('generateCsvButton');
+        const resetButton = document.getElementById('resetButton');
+
+        const ctx = imageCanvas.getContext('2d');
+
+        let originalImage = null; // Stores the loaded Image object
+
+        /**
+         * Displays a custom message box to the user instead of alert().
+         * @param {string} message - The message to display.
+         * @param {string} type - Type of message (e.g., 'info', 'error').
+         * @returns {Promise<void>} - A promise that resolves when the message box is closed.
+         */
+        function showMessageBox(message, type = 'info') {
+            return new Promise(resolve => {
+                const overlay = document.createElement('div');
+                overlay.className = 'overlay';
+                document.body.appendChild(overlay);
+
+                const messageBox = document.createElement('div');
+                messageBox.className = 'message-box';
+                messageBox.innerHTML = `
+                    <p class="text-lg font-medium">${message}</p>
+                    <button id="messageBoxOkButton" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded">OK</button>
+                `;
+                document.body.appendChild(messageBox);
+
+                const okButton = document.getElementById('messageBoxOkButton');
+                okButton.onclick = () => {
+                    document.body.removeChild(messageBox);
+                    document.body.removeChild(overlay);
+                    resolve();
+                };
+            });
+        }
+
+        /**
+         * Resets the application to its initial state.
+         */
+        function resetApp() {
+            originalImage = null;
+            ctx.clearRect(0, 0, imageCanvas.width, imageCanvas.height);
+            imageCanvas.width = 0;
+            imageCanvas.height = 0;
+
+            imageUpload.value = ''; // Clear file input
+            generateCsvButton.disabled = true;
+
+            showMessageBox('Application reset successfully!', 'info');
+        }
+
+        /**
+         * Draws the original image onto its canvas, scaling to fit.
+         */
+        function drawImageOnCanvas() {
+            if (!originalImage) return;
+
+            const maxWidth = imageCanvas.parentElement.clientWidth;
+            const maxHeight = window.innerHeight * 0.6; // Max 60% of viewport height
+
+            let scaledWidth = originalImage.width;
+            let scaledHeight = originalImage.height;
+
+            if (scaledWidth > maxWidth) {
+                scaledHeight = (scaledHeight / scaledWidth) * maxWidth;
+                scaledWidth = maxWidth;
+            }
+            if (scaledHeight > maxHeight) {
+                scaledWidth = (scaledWidth / scaledHeight) * maxHeight;
+                scaledHeight = maxHeight;
+            }
+
+            imageCanvas.width = scaledWidth;
+            imageCanvas.height = scaledHeight;
+            ctx.clearRect(0, 0, imageCanvas.width, imageCanvas.height);
+            // FIX: Changed originalCanvas.width/height to imageCanvas.width/height
+            ctx.drawImage(originalImage, 0, 0, imageCanvas.width, imageCanvas.height); 
+
+            generateCsvButton.disabled = false; // Enable button once image is loaded
+        }
+
+        /**
+         * Converts an RGB color component (0-255) to a two-digit hexadecimal string.
+         * @param {number} c - The color component.
+         * @returns {string} - The hexadecimal string.
+         */
+        function componentToHex(c) {
+            const hex = Math.round(c).toString(16);
+            return hex.length === 1 ? "0" + hex : hex;
+        }
+
+        /**
+         * Converts RGB values to a hexadecimal color string (e.g., "RRGGBB").
+         * @param {number} r - Red component (0-255).
+         * @param {number} g - Green component (0-255).
+         * @param {number} b - Blue component (0-255).
+         * @returns {string} - The hexadecimal color string.
+         */
+        function rgbToHex(r, g, b) {
+            return componentToHex(r) + componentToHex(g) + componentToHex(b);
+        }
+
+        /**
+         * Generates a CSV string containing the hex codes for each pixel.
+         * @returns {string} - The CSV content.
+         */
+        function generatePixelHexCsv() {
+            if (!originalImage) {
+                showMessageBox('Please upload an image first!', 'error');
+                return '';
+            }
+
+            // Use a temporary canvas at ORIGINAL image resolution to get accurate pixel data
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = originalImage.width;
+            tempCanvas.height = originalImage.height;
+            const tempCtx = tempCanvas.getContext('2d');
+            tempCtx.drawImage(originalImage, 0, 0);
+            const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+            const pixels = imageData.data;
+            const width = tempCanvas.width;
+            const height = tempCanvas.height;
+
+            let csvContent = "";
+
+            for (let y = 0; y < height; y++) {
+                let row = [];
+                for (let x = 0; x < width; x++) {
+                    const index = (y * width + x) * 4;
+                    const r = pixels[index];
+                    const g = pixels[index + 1];
+                    const b = pixels[index + 2];
+                    // Alpha (pixels[index + 3]) is ignored for hex code as per standard RRGGBB format
+                    row.push(rgbToHex(r, g, b));
+                }
+                csvContent += row.join(',') + '\n';
+            }
+            return csvContent;
+        }
+
+        /**
+         * Downloads the generated CSV content as a file.
+         */
+        function downloadCsv() {
+            const csv = generatePixelHexCsv();
+            if (!csv) return; // Do not proceed if CSV generation failed
+
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', 'pixel_hex_colors.csv');
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            showMessageBox('CSV file downloaded successfully!', 'info');
+        }
+
+
+        // Event Listeners
+        imageUpload.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        originalImage = img;
+                        drawImageOnCanvas(); // Draw image and enable CSV button
+                    };
+                    img.onerror = () => {
+                        showMessageBox('Could not load image. Please try a different file.', 'error');
+                        resetApp();
+                    };
+                    img.src = event.target.result;
+                };
+                reader.onerror = () => {
+                    showMessageBox('Error reading file. Please try again.', 'error');
+                    resetApp();
+                };
+                reader.readAsDataURL(file);
+            } else {
+                resetApp();
+            }
+        });
+
+        generateCsvButton.addEventListener('click', downloadCsv);
+        resetButton.addEventListener('click', resetApp);
+
+        // Initial setup on window load
+        window.onload = () => {
+            resetApp(); // Ensure initial state is clean
+        };
+    </script>
+</body>
+</html>
