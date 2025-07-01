@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Color Segmentation</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles for responsiveness and appearance */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f2f5;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            padding: 1rem;
+            box-sizing: border-box;
+        }
+        .container {
+            background-color: #ffffff;
+            border-radius: 1rem;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            padding: 2rem;
+            max-width: 1000px;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            align-items: center;
+        }
+        .canvas-section {
+            display: flex;
+            flex-direction: column; /* Default to column for small screens */
+            gap: 1.5rem;
+            width: 100%;
+            justify-content: center;
+            align-items: flex-start;
+        }
+
+        @media (min-width: 768px) { /* On medium screens and up, arrange side-by-side */
+            .canvas-section {
+                flex-direction: row;
+                align-items: flex-start;
+            }
+        }
+
+        .canvas-wrapper {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+        }
+
+        canvas {
+            border: 2px solid #cbd5e1; /* slate-300 */
+            border-radius: 0.75rem; /* rounded-xl */
+            background-color: #f8fafc; /* slate-50 */
+            max-width: 100%;
+            height: auto; /* Maintain aspect ratio */
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+        }
+
+        /* Message Box Styling */
+        .message-box {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: #fff;
+            padding: 20px 30px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            align-items: center;
+            text-align: center;
+            animation: fadeIn 0.3s ease-out;
+            max-width: 90%;
+        }
+
+        .message-box button {
+            padding: 8px 20px;
+            background-color: #4f46e5;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+
+        .message-box button:hover {
+            background-color: #4338ca;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translate(-50%, -60%); }
+            to { opacity: 1; transform: translate(-50%, -50%); }
+        }
+
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-center min-h-screen bg-gray-100 p-4">
+    <div class="container">
+        <h1 class="text-3xl font-bold text-gray-800 mb-4">Image Color Segmentation</h1>
+
+        <!-- File Upload Section -->
+        <div class="w-full text-center mb-6">
+            <label for="imageUpload" class="block text-lg font-medium text-gray-700 mb-2">Upload an Image:</label>
+            <input type="file" id="imageUpload" accept="image/*" class="block w-full text-sm text-gray-500
+                file:mr-4 file:py-2 file:px-4
+                file:rounded-full file:border-0
+                file:text-sm file:font-semibold
+                file:bg-indigo-50 file:text-indigo-700
+                hover:file:bg-indigo-100"/>
+        </div>
+
+        <!-- Filter Controls -->
+        <div class="flex flex-wrap items-center justify-center gap-4 mb-4 w-full">
+            <div class="flex items-center">
+                <label for="colorThreshold" class="mr-2 text-gray-700">Color Similarity Threshold:</label>
+                <input type="range" id="colorThreshold" min="0" max="765" step="5" value="150" class="w-32">
+                <span id="thresholdValue" class="ml-2 text-gray-600">150</span>
+            </div>
+            <button id="applySegmentationButton" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-full shadow-md transition-all text-sm disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                Apply Segmentation
+            </button>
+            <button id="resetButton" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-full shadow-md transition-all text-sm">
+                Reset
+            </button>
+        </div>
+
+        <!-- Canvas Section -->
+        <div class="canvas-section">
+            <div class="canvas-wrapper">
+                <h2 class="text-xl font-semibold text-gray-700 mb-2">Original Image:</h2>
+                <canvas id="originalCanvas"></canvas>
+            </div>
+            <div class="canvas-wrapper">
+                <h2 class="text-xl font-semibold text-gray-700 mb-2">Segmented Image:</h2>
+                <canvas id="segmentedCanvas"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Get references to DOM elements
+        const imageUpload = document.getElementById('imageUpload');
+        const originalCanvas = document.getElementById('originalCanvas');
+        const segmentedCanvas = document.getElementById('segmentedCanvas');
+        const colorThresholdSlider = document.getElementById('colorThreshold');
+        const thresholdValueSpan = document.getElementById('thresholdValue');
+        const applySegmentationButton = document.getElementById('applySegmentationButton');
+        const resetButton = document.getElementById('resetButton');
+
+        const originalCtx = originalCanvas.getContext('2d');
+        const segmentedCtx = segmentedCanvas.getContext('2d');
+
+        let originalImage = null; // Stores the loaded Image object
+        let currentColorThreshold = 150; // Default color similarity threshold (Manhattan distance) - Increased default
+
+        /**
+         * Displays a custom message box to the user instead of alert().
+         * @param {string} message - The message to display.
+         * @param {string} type - Type of message (e.g., 'info', 'error').
+         * @returns {Promise<void>} - A promise that resolves when the message box is closed.
+         */
+        function showMessageBox(message, type = 'info') {
+            return new Promise(resolve => {
+                const overlay = document.createElement('div');
+                overlay.className = 'overlay';
+                document.body.appendChild(overlay);
+
+                const messageBox = document.createElement('div');
+                messageBox.className = 'message-box';
+                messageBox.innerHTML = `
+                    <p class="text-lg font-medium">${message}</p>
+                    <button id="messageBoxOkButton" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded">OK</button>
+                `;
+                document.body.appendChild(messageBox);
+
+                const okButton = document.getElementById('messageBoxOkButton');
+                okButton.onclick = () => {
+                    document.body.removeChild(messageBox);
+                    document.body.removeChild(overlay);
+                    resolve();
+                };
+            });
+        }
+
+        /**
+         * Resets the application to its initial state.
+         */
+        function resetApp() {
+            originalImage = null;
+            originalCtx.clearRect(0, 0, originalCanvas.width, originalCanvas.height);
+            originalCanvas.width = 0;
+            originalCanvas.height = 0;
+
+            segmentedCtx.clearRect(0, 0, segmentedCanvas.width, segmentedCanvas.height);
+            segmentedCanvas.width = 0;
+            segmentedCanvas.height = 0;
+
+            imageUpload.value = ''; // Clear file input
+            applySegmentationButton.disabled = true;
+            colorThresholdSlider.value = 150; // Reset to new default
+            thresholdValueSpan.textContent = '150'; // Reset to new default
+            currentColorThreshold = 150; // Reset to new default
+
+            showMessageBox('Application reset successfully!', 'info');
+        }
+
+        /**
+         * Draws the original image onto its canvas, scaling to fit.
+         */
+        function drawOriginalImage() {
+            if (!originalImage) {
+                console.log("drawOriginalImage: originalImage is null, cannot draw.");
+                return;
+            }
+            console.log("drawOriginalImage: Drawing original image on canvas.");
+
+            const maxWidth = originalCanvas.parentElement.clientWidth;
+            const maxHeight = window.innerHeight * 0.4; // Max 40% of viewport height
+
+            let scaledWidth = originalImage.width;
+            let scaledHeight = originalImage.height;
+
+            // Scale down if image is too large for display canvases
+            if (scaledWidth > maxWidth) {
+                scaledHeight = (scaledHeight / scaledWidth) * maxWidth;
+                scaledWidth = maxWidth;
+            }
+            if (scaledHeight > maxHeight) {
+                scaledWidth = (scaledWidth / scaledHeight) * maxHeight;
+                scaledHeight = maxHeight;
+            }
+
+            originalCanvas.width = scaledWidth;
+            originalCanvas.height = scaledHeight;
+            originalCtx.clearRect(0, 0, originalCanvas.width, originalCanvas.height);
+            originalCtx.drawImage(originalImage, 0, 0, originalCanvas.width, originalCanvas.height);
+
+            // Set segmented canvas to the SAME SCALED dimensions as the original display canvas
+            // This is the key change to prevent rendering issues with large images
+            segmentedCanvas.width = scaledWidth;
+            segmentedCanvas.height = scaledHeight;
+            segmentedCtx.clearRect(0, 0, segmentedCanvas.width, segmentedCanvas.height);
+
+            applySegmentationButton.disabled = false; // Enable button once image is loaded
+            applyColorSegmentation(); // Automatically apply segmentation on load
+        }
+
+        /**
+         * Calculates the Manhattan distance between two colors (R, G, B components).
+         * @param {Array<number>} color1 - [R, G, B] array for the first color.
+         * @param {Array<number>} color2 - [R, G, B] array for the second color.
+         * @returns {number} - The Manhattan distance.
+         */
+        function getColorDistance(color1, color2) {
+            return Math.abs(color1[0] - color2[0]) +
+                   Math.abs(color1[1] - color2[1]) +
+                   Math.abs(color1[2] - color2[2]);
+        }
+
+        /**
+         * Applies color-based segmentation to the image.
+         * Uses a Flood Fill (BFS) approach to identify connected regions of similar colors.
+         */
+        function applyColorSegmentation() {
+            if (!originalImage) {
+                console.log("applyColorSegmentation: originalImage is null, cannot segment.");
+                showMessageBox('Please upload an image first!', 'error');
+                return;
+            }
+            console.log("applyColorSegmentation: Starting segmentation process.");
+
+            // Create a temporary canvas at ORIGINAL image resolution for accurate pixel processing
+            const processingCanvas = document.createElement('canvas');
+            processingCanvas.width = originalImage.width;
+            processingCanvas.height = originalImage.height;
+            const processingCtx = processingCanvas.getContext('2d');
+            processingCtx.drawImage(originalImage, 0, 0);
+            const originalImageData = processingCtx.getImageData(0, 0, processingCanvas.width, processingCanvas.height);
+            const originalPixels = originalImageData.data;
+            const width = processingCanvas.width;
+            const height = processingCanvas.height;
+
+            console.log(`Image dimensions for segmentation processing: ${width}x${height}`);
+            console.log(`Original pixels data length: ${originalPixels.length}`);
+            console.log(`Current color threshold: ${currentColorThreshold}`);
+
+            // visited: tracks if a pixel has been processed (0: no, 1: yes)
+            const visited = new Uint8Array(width * height).fill(0);
+            const segmentColors = []; // Stores average color for each segment (index corresponds to label)
+            const labels = new Uint32Array(width * height).fill(0); // Stores the segment label for each pixel
+
+            let currentLabel = 1; // Start labels from 1
+
+            // Directions for 4-directional BFS (up, down, left, right)
+            const dx = [0, 0, 1, -1];
+            const dy = [1, -1, 0, 0];
+
+            // Iterate through every pixel to find unvisited ones and start new segments
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    const pixelFlatIndex = y * width + x;
+
+                    if (visited[pixelFlatIndex] === 0) {
+                        const queue = [];
+                        queue.push({ x, y });
+                        visited[pixelFlatIndex] = 1;
+                        labels[pixelFlatIndex] = currentLabel;
+
+                        let sumR = 0, sumG = 0, sumB = 0, sumA = 0;
+                        let pixelCount = 0;
+
+                        // Manual queue head
+                        let head = 0; 
+                        while (head < queue.length) {
+                            const { cx, cy } = queue[head++];
+                            const currentPixelIndex = (cy * width + cx) * 4;
+
+                            sumR += originalPixels[currentPixelIndex];
+                            sumG += originalPixels[currentPixelIndex + 1];
+                            sumB += originalPixels[currentPixelIndex + 2];
+                            sumA += originalPixels[currentPixelIndex + 3];
+                            pixelCount++;
+
+                            const currentPixelColor = [ // Get current pixel's color
+                                originalPixels[currentPixelIndex],
+                                originalPixels[currentPixelIndex + 1],
+                                originalPixels[currentPixelIndex + 2]
+                            ];
+
+                            // Check neighbors
+                            for (let i = 0; i < 4; i++) {
+                                const nx = cx + dx[i];
+                                const ny = cy + dy[i];
+                                const neighborFlatIndex = ny * width + nx;
+
+                                // Check bounds and if already visited
+                                if (nx >= 0 && nx < width && ny >= 0 && ny < height && visited[neighborFlatIndex] === 0) {
+                                    const neighborColorIndex = neighborFlatIndex * 4;
+                                    const neighborColor = [
+                                        originalPixels[neighborColorIndex],
+                                        originalPixels[neighborColorIndex + 1],
+                                        originalPixels[neighborColorIndex + 2]
+                                    ];
+
+                                    // IMPORTANT FIX: Compare neighbor to the CURRENT pixel's color in BFS
+                                    if (getColorDistance(currentPixelColor, neighborColor) <= currentColorThreshold) {
+                                        visited[neighborFlatIndex] = 1;
+                                        labels[neighborFlatIndex] = currentLabel;
+                                        queue.push({ x: nx, y: ny });
+                                    }
+                                }
+                            }
+                        }
+
+                        // Calculate average color for the segment
+                        const avgR = pixelCount > 0 ? Math.floor(sumR / pixelCount) : 0;
+                        const avgG = pixelCount > 0 ? Math.floor(sumG / pixelCount) : 0;
+                        const avgB = pixelCount > 0 ? Math.floor(sumB / pixelCount) : 0;
+                        const avgA = pixelCount > 0 ? Math.floor(sumA / pixelCount) : 0; // Keep alpha as is
+
+                        segmentColors[currentLabel] = [avgR, avgG, avgB, avgA];
+                        // console.log(`Segment ${currentLabel} found with ${pixelCount} pixels. Avg Color: rgba(${avgR}, ${avgG}, ${avgB}, ${avgA})`);
+                        currentLabel++;
+                    }
+                }
+            }
+            console.log(`Total segments identified: ${currentLabel - 1}`);
+
+            // Create ImageData for the full-resolution segmented image
+            const fullResSegmentedImageData = processingCtx.createImageData(width, height);
+            const fullResSegmentedPixels = fullResSegmentedImageData.data;
+
+            for (let i = 0; i < originalPixels.length; i += 4) {
+                const flatIndex = i / 4;
+                const label = labels[flatIndex];
+                const avgColor = segmentColors[label];
+
+                if (avgColor) {
+                    fullResSegmentedPixels[i] = avgColor[0];
+                    fullResSegmentedPixels[i + 1] = avgColor[1];
+                    fullResSegmentedPixels[i + 2] = avgColor[2];
+                    fullResSegmentedPixels[i + 3] = avgColor[3];
+                } else {
+                    fullResSegmentedPixels[i] = originalPixels[i];
+                    fullResSegmentedPixels[i + 1] = originalPixels[i + 1];
+                    fullResSegmentedPixels[i + 2] = originalPixels[i + 2];
+                    fullResSegmentedPixels[i + 3] = originalPixels[i + 3];
+                }
+            }
+            
+            // Put the full-resolution segmented image data onto the processing canvas
+            processingCtx.putImageData(fullResSegmentedImageData, 0, 0);
+
+            // Finally, draw the content of the full-resolution processing canvas
+            // onto the scaled segmentedCanvas for display
+            segmentedCtx.clearRect(0, 0, segmentedCanvas.width, segmentedCanvas.height); // Clear before drawing
+            segmentedCtx.drawImage(processingCanvas, 0, 0, segmentedCanvas.width, segmentedCanvas.height);
+            console.log("Segmentation applied and image drawn on segmented canvas.");
+        }
+
+
+        // Event Listeners
+        imageUpload.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                console.log("File selected:", file.name);
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    console.log("FileReader loaded image data.");
+                    const img = new Image();
+                    img.onload = () => {
+                        console.log("Image object loaded. Dimensions:", img.width, img.height);
+                        originalImage = img;
+                        drawOriginalImage(); // Draw original and trigger segmentation
+                    };
+                    img.onerror = () => {
+                        console.error("Image object failed to load.");
+                        showMessageBox('Could not load image. Please try a different file.', 'error');
+                        resetApp();
+                    };
+                    img.src = event.target.result;
+                };
+                reader.onerror = () => {
+                    console.error("FileReader failed to read file.");
+                    showMessageBox('Error reading file. Please try again.', 'error');
+                    resetApp();
+                };
+                reader.readAsDataURL(file);
+            } else {
+                console.log("No file selected.");
+                resetApp();
+            }
+        });
+
+        colorThresholdSlider.addEventListener('input', (e) => {
+            currentColorThreshold = parseInt(e.target.value, 10);
+            thresholdValueSpan.textContent = currentColorThreshold;
+            console.log("Color threshold changed to:", currentColorThreshold);
+            applyColorSegmentation(); // Re-apply segmentation with new threshold
+        });
+
+        applySegmentationButton.addEventListener('click', () => {
+            console.log("Apply Segmentation button clicked.");
+            applyColorSegmentation();
+        });
+        resetButton.addEventListener('click', () => {
+            console.log("Reset button clicked.");
+            resetApp();
+        });
+
+        // Initial setup on window load
+        window.onload = () => {
+            console.log("Window loaded. Initializing app.");
+            resetApp(); // Ensure initial state is clean
+        };
+    </script>
+</body>
+</html>
