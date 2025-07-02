@@ -1,0 +1,1040 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Art Deco Travel Poster Creator</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Custom styles for the Inter font and overall aesthetic */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8; /* Light gray-blue background */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 1rem;
+        }
+        .container {
+            max-width: 1000px; /* Increased max-width for more content */
+            width: 100%;
+        }
+        .card {
+            background-color: #ffffff;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            border-radius: 12px;
+        }
+        .button-primary {
+            background-color: #4a5568; /* Darker gray for primary action */
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: background-color 0.2s ease;
+        }
+        .button-primary:hover {
+            background-color: #2d3748; /* Even darker on hover */
+        }
+        input[type="file"] {
+            display: none; /* Hide default file input */
+        }
+        .custom-file-upload {
+            border: 2px dashed #a0aec0; /* Light gray dashed border */
+            padding: 1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            text-align: center;
+            color: #4a5568; /* Darker gray text */
+            transition: border-color 0.2s ease;
+        }
+        .custom-file-upload:hover {
+            border-color: #4299e1; /* Blue on hover */
+        }
+        .image-preview-container {
+            min-height: 150px; /* Adjusted min-height for input area */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #edf2f7; /* Lighter gray background for image areas */
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid #cbd5e0; /* Light border */
+        }
+        .image-preview {
+            max-width: 100%;
+            max-height: 300px; /* Limit height for better display */
+            height: auto;
+            border-radius: 6px;
+        }
+        canvas {
+            background-color: #f0f4f8; /* Canvas background for visibility */
+            border: 1px solid #cbd5e0;
+            border-radius: 8px;
+            display: block;
+            width: 100%; /* Make canvas responsive */
+            height: auto; /* Maintain aspect ratio */
+        }
+        /* Message box styling */
+        .message-box {
+            background-color: #fff3cd;
+            border: 1px solid #ffeeba;
+            color: #856404;
+            padding: 0.75rem 1.25rem;
+            border-radius: 0.25rem;
+            margin-bottom: 1rem;
+            text-align: center;
+            transition: opacity 0.3s ease-in-out;
+            opacity: 0; /* Hidden by default */
+        }
+        .message-box.show {
+            opacity: 1;
+        }
+        .palette-display-color {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            border: 1px solid #ccc;
+            display: inline-block;
+            margin: 2px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container mx-auto p-6 bg-white rounded-lg shadow-xl card">
+        <h1 class="text-3xl sm:text-4xl font-bold text-center mb-6 text-gray-800">
+            Art Deco Travel Poster Creator
+        </h1>
+        <p class="text-center text-gray-600 mb-8">
+            Upload an image, add text, and apply Art Deco inspired stylization.
+        </p>
+
+        <div id="messageBox" class="message-box hidden" role="alert"></div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+            <!-- Left Panel: Image Upload and Controls -->
+            <div>
+                <h2 class="text-2xl font-semibold text-gray-700 mb-4">Your Image & Text</h2>
+
+                <!-- Image Upload -->
+                <label for="imageUpload" class="custom-file-upload block mb-4">
+                    <input type="file" id="imageUpload" accept="image/*">
+                    <p class="text-lg font-semibold mb-2">Click or drag an image here</p>
+                    <p class="text-sm text-gray-500">Supported formats: JPG, PNG, GIF</p>
+                </label>
+                <div class="image-preview-container border border-gray-300 rounded-lg flex items-center justify-center p-4 mb-6">
+                    <img id="imagePreview" class="image-preview hidden" src="#" alt="Image Preview">
+                    <p id="imagePlaceholder" class="text-gray-400">Your uploaded image will appear here</p>
+                </div>
+
+                <!-- Text Inputs -->
+                <div class="mb-4">
+                    <label for="posterTitle" class="block text-gray-700 text-sm font-bold mb-2">Poster Title:</label>
+                    <input type="text" id="posterTitle" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline rounded-md p-2" placeholder="e.g., VISIT PARIS">
+                </div>
+                <div class="mb-4">
+                    <label for="posterSlogan" class="block text-gray-700 text-sm font-bold mb-2">Poster Slogan:</label>
+                    <input type="text" id="posterSlogan" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline rounded-md p-2" placeholder="e.g., CITY OF LIGHTS">
+                </div>
+
+                <!-- Text Color Pickers -->
+                <div class="grid grid-cols-2 gap-4 mb-6">
+                    <div>
+                        <label for="titleColor" class="block text-gray-700 text-sm font-bold mb-2">Title Color:</label>
+                        <input type="color" id="titleColor" value="#FFFFFF" class="w-full h-10 rounded-md border border-gray-300">
+                    </div>
+                    <div>
+                        <label for="sloganColor" class="block text-gray-700 text-sm font-bold mb-2">Slogan Color:</label>
+                        <input type="color" id="sloganColor" value="#F0C674" class="w-full h-10 rounded-md border border-gray-300">
+                    </div>
+                </div>
+
+                <!-- Font Size Controls -->
+                <div class="grid grid-cols-2 gap-4 mb-6">
+                    <div>
+                        <label for="titleFontSize" class="block text-gray-700 text-sm font-bold mb-2">Title Font Size (px):</label>
+                        <input type="number" id="titleFontSize" value="60" min="10" max="200" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline rounded-md p-2">
+                    </div>
+                    <div>
+                        <label for="sloganFontSize" class="block text-gray-700 text-sm font-bold mb-2">Slogan Font Size (px):</label>
+                        <input type="number" id="sloganFontSize" value="30" min="10" max="100" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline rounded-md p-2">
+                    </div>
+                </div>
+                
+                <!-- Stylization Controls -->
+                <div class="mb-4">
+                    <h3 class="text-lg font-semibold text-gray-700 mb-2">Image Stylization:</h3>
+                    <div class="mb-4">
+                        <label for="paletteSelector" class="block text-gray-700 text-sm font-bold mb-2">Choose Color Palette:</label>
+                        <select id="paletteSelector" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline rounded-md p-2">
+                            <option value="ready-made">Ready-Made Palettes</option>
+                            <option value="image-derived">Image-Derived Palette</option>
+                            <option value="custom">Custom Palette</option>
+                        </select>
+                    </div>
+
+                    <!-- Ready-Made Palettes Sub-section -->
+                    <div id="readyMadePalettesSection" class="mb-4">
+                        <label for="predefinedPaletteSelector" class="block text-gray-700 text-sm font-bold mb-2">Select Ready-Made Palette:</label>
+                        <select id="predefinedPaletteSelector" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline rounded-md p-2">
+                            <option value="classic">Classic Art Deco</option>
+                            <option value="cool">Cool Tones</option>
+                            <option value="warm">Warm Tones</option>
+                            <option value="monochrome-gold">Monochrome with Gold Accent</option>
+                            <option value="vibrant-retro">Vibrant Retro</option>
+                            <option value="emerald-city">Emerald City</option>
+                            <option value="midnight-glamour">Midnight Glamour</option>
+                            <option value="desert-sunset">Desert Sunset</option>
+                            <option value="ocean-breeze">Ocean Breeze</option>
+                        </select>
+                    </div>
+
+                    <!-- Image-Derived Palette Controls (initially hidden) -->
+                    <div id="imageDerivedPaletteControls" class="hidden border border-gray-300 p-4 rounded-md mb-4 bg-gray-50">
+                        <h4 class="text-md font-semibold text-gray-700 mb-3">Image-Derived Palette Options:</h4>
+                        <div class="mb-3">
+                            <label for="numImageDerivedColors" class="block text-gray-700 text-sm font-bold mb-2">Number of Colors:</label>
+                            <input type="range" id="numImageDerivedColors" value="8" min="2" max="15" class="w-full h-6 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                            <span id="numImageDerivedColorsValue" class="text-sm text-gray-600">8 colors</span>
+                        </div>
+                        <div id="imageDerivedColorInputs" class="grid grid-cols-2 gap-4 mb-4">
+                            <!-- Color inputs will be dynamically added here -->
+                        </div>
+                        <div class="flex justify-between gap-2">
+                            <button id="addImageDerivedColor" class="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-md transition-all duration-200">Add Color</button>
+                            <button id="removeImageDerivedColor" class="flex-1 bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-md transition-all duration-200">Remove Last Color</button>
+                        </div>
+                        <button id="applyImageDerivedPalette" class="button-primary bg-purple-600 hover:bg-purple-700 mt-4 w-full">Apply Image-Derived Palette</button>
+                    </div>
+
+                    <!-- Custom Palette Controls (initially hidden) -->
+                    <div id="customPaletteControls" class="hidden border border-gray-300 p-4 rounded-md mb-4 bg-gray-50">
+                        <h4 class="text-md font-semibold text-gray-700 mb-3">Define Custom Palette:</h4>
+                        <div class="mb-3">
+                            <label for="numCustomColors" class="block text-gray-700 text-sm font-bold mb-2">Number of Colors:</label>
+                            <input type="range" id="numCustomColors" value="5" min="1" max="10" class="w-full h-6 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                            <span id="numCustomColorsValue" class="text-sm text-gray-600">5 colors</span>
+                        </div>
+                        <div id="customColorInputs" class="grid grid-cols-2 gap-4 mb-4">
+                            <!-- Color inputs will be dynamically added here -->
+                        </div>
+                        <div class="flex justify-between gap-2">
+                            <button id="addCustomColor" class="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-md transition-all duration-200">Add Color</button>
+                            <button id="removeCustomColor" class="flex-1 bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-md transition-all duration-200">Remove Last Color</button>
+                        </div>
+                        <button id="applyCustomPalette" class="button-primary bg-purple-600 hover:bg-purple-700 mt-4 w-full">Apply Custom Palette</button>
+                    </div>
+
+                    <label for="blurRadius" class="block text-gray-700 text-sm font-bold mb-2">Blur Radius (pixels):</label>
+                    <input type="range" id="blurRadius" min="0" max="10" value="2" class="w-full h-6 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                    <span id="blurValue" class="text-sm text-gray-600">2 pixels</span>
+                </div>
+
+            </div>
+
+            <!-- Right Panel: Canvas Output -->
+            <div>
+                <h2 class="text-2xl font-semibold text-gray-700 mb-4">Your Poster Preview</h2>
+                <canvas id="posterCanvas" width="800" height="1200" class="w-full rounded-lg shadow-md"></canvas>
+                <div class="mt-6 text-center">
+                    <button id="renderButton" class="button-primary w-full md:w-auto hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 transition-all duration-300" disabled>
+                        Apply Style & Render
+                    </button>
+                </div>
+                <!-- Display of current palette colors -->
+                <div id="currentPaletteDisplay" class="mt-4 p-3 border border-gray-300 rounded-md bg-gray-50">
+                    <h4 class="text-md font-semibold text-gray-700 mb-2">Current Palette:</h4>
+                    <div id="paletteColorSwatches" class="flex flex-wrap justify-center">
+                        <!-- Color swatches will be dynamically added here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Download Button -->
+        <div id="downloadSection" class="hidden text-center mt-6">
+            <a id="downloadLink" href="#" download="art-deco-poster.png" class="button-primary bg-green-600 hover:bg-green-700">
+                Download Poster
+            </a>
+        </div>
+    </div>
+
+    <script>
+        // Get references to DOM elements
+        const imageUpload = document.getElementById('imageUpload');
+        const imagePreview = document.getElementById('imagePreview');
+        const imagePlaceholder = document.getElementById('imagePlaceholder');
+        const posterCanvas = document.getElementById('posterCanvas');
+        const ctx = posterCanvas.getContext('2d');
+        const posterTitleInput = document.getElementById('posterTitle');
+        const posterSloganInput = document.getElementById('posterSlogan');
+        const titleColorInput = document.getElementById('titleColor');
+        const sloganColorInput = document.getElementById('sloganColor');
+        const titleFontSizeInput = document.getElementById('titleFontSize');
+        const sloganFontSizeInput = document.getElementById('sloganFontSize');
+        const renderButton = document.getElementById('renderButton');
+        const downloadSection = document.getElementById('downloadSection');
+        const downloadLink = document.getElementById('downloadLink');
+        const messageBox = document.getElementById('messageBox');
+        const blurRadiusInput = document.getElementById('blurRadius');
+        const blurValueSpan = document.getElementById('blurValue');
+        const paletteSelector = document.getElementById('paletteSelector');
+        const predefinedPaletteSelector = document.getElementById('predefinedPaletteSelector');
+        const readyMadePalettesSection = document.getElementById('readyMadePalettesSection');
+        const customPaletteControls = document.getElementById('customPaletteControls');
+        const numCustomColorsInput = document.getElementById('numCustomColors');
+        const numCustomColorsValueSpan = document.getElementById('numCustomColorsValue');
+        const customColorInputsContainer = document.getElementById('customColorInputs');
+        const addCustomColorButton = document.getElementById('addCustomColor');
+        const removeCustomColorButton = document.getElementById('removeCustomColor');
+        const applyCustomPaletteButton = document.getElementById('applyCustomPalette');
+
+        const imageDerivedPaletteControls = document.getElementById('imageDerivedPaletteControls');
+        const numImageDerivedColorsInput = document.getElementById('numImageDerivedColors');
+        const numImageDerivedColorsValueSpan = document.getElementById('numImageDerivedColorsValue');
+        const imageDerivedColorInputsContainer = document.getElementById('imageDerivedColorInputs');
+        const addImageDerivedColorButton = document.getElementById('addImageDerivedColor');
+        const removeImageDerivedColorButton = document.getElementById('removeImageDerivedColor');
+        const applyImageDerivedPaletteButton = document.getElementById('applyImageDerivedPalette');
+
+        const paletteColorSwatches = document.getElementById('paletteColorSwatches');
+
+
+        let uploadedImage = null; // Stores the original Image object
+        let processedImageData = null; // Stores the processed ImageData for drawing
+        let currentPalette = []; // The palette currently in use for image processing
+        let customColors = ["#FF0000", "#00FF00", "#0000FF", "#FFFF00", "#00FFFF"]; // Default custom colors
+        let imageDerivedColors = []; // Stores the current image-derived colors, allowing adjustment
+
+        // Function to display messages to the user
+        function showMessage(message, type = 'warning') {
+            messageBox.textContent = message;
+            messageBox.className = 'message-box show'; // Reset classes
+            if (type === 'error') {
+                messageBox.style.backgroundColor = '#f8d7da';
+                messageBox.style.borderColor = '#f5c6cb';
+                messageBox.style.color = '#721c24';
+            } else if (type === 'success') {
+                messageBox.style.backgroundColor = '#d4edda';
+                messageBox.style.borderColor = '#c3e6cb';
+                messageBox.style.color = '#155724';
+            } else { // warning or default
+                messageBox.style.backgroundColor = '#fff3cd';
+                messageBox.style.borderColor = '#ffeeba';
+                messageBox.style.color = '#856404';
+            }
+            setTimeout(() => {
+                messageBox.classList.remove('show');
+            }, 5000); // Hide after 5 seconds
+        }
+
+        // Define multiple Art Deco Color Palettes
+        const artDecoPalettes = {
+            'classic': [
+                [255, 255, 255], // White
+                [0, 0, 0],       // Black
+                [20, 80, 120],   // Deep Blue
+                [180, 150, 90],  // Gold/Bronze
+                [150, 40, 40],   // Deep Red
+                [220, 200, 160], // Cream/Beige
+                [80, 120, 80],   // Forest Green
+                [50, 50, 50],    // Dark Gray
+            ],
+            'cool': [
+                [240, 248, 255], // AliceBlue (lightest)
+                [173, 216, 230], // LightBlue
+                [100, 149, 237], // CornflowerBlue
+                [65, 105, 225],  // RoyalBlue
+                [25, 25, 112],   // MidnightBlue (darkest)
+                [70, 80, 90],    // Darkish Grey
+            ],
+            'warm': [
+                [255, 248, 220], // Cornsilk (lightest)
+                [255, 228, 181], // Moccasin
+                [210, 180, 140], // Tan
+                [139, 69, 19],   // SaddleBrown
+                [101, 67, 33],   // Dark Brown (darkest)
+                [180, 150, 90],  // Gold
+            ],
+            'monochrome-gold': [
+                [255, 255, 255], // White
+                [220, 220, 220], // Gainsboro
+                [169, 169, 169], // DarkGray
+                [105, 105, 105], // DimGray
+                [50, 50, 50],    // Darker Gray
+                [0, 0, 0],       // Black
+                [212, 175, 55],  // Gold Accent
+            ],
+            'vibrant-retro': [
+                [255, 105, 180], // Hot Pink
+                [0, 206, 209],   // Dark Turquoise
+                [255, 215, 0],   // Gold
+                [148, 0, 211],   // Dark Violet
+                [0, 191, 255],   // Deep Sky Blue
+                [255, 69, 0],    // Red-Orange
+                [0, 128, 0],     // Green
+            ],
+            'emerald-city': [
+                [240, 255, 240], // Honeydew (lightest)
+                [144, 238, 144], // LightGreen
+                [60, 179, 113],  // MediumSeaGreen
+                [46, 139, 87],   // SeaGreen
+                [0, 100, 0],     // DarkGreen (darkest)
+                [255, 215, 0],   // Gold Accent
+                [105, 105, 105], // DimGray for contrast
+            ],
+            'midnight-glamour': [
+                [25, 25, 112],   // MidnightBlue (darkest)
+                [72, 61, 139],   // DarkSlateBlue
+                [106, 90, 205],  // SlateBlue
+                [176, 196, 222], // LightSteelBlue
+                [255, 250, 250], // Snow (lightest)
+                [218, 165, 32],  // Goldenrod (gold accent)
+                [139, 0, 0],     // DarkRed (deep accent)
+            ],
+            'desert-sunset': [
+                [255, 250, 205], // LemonChiffon (lightest)
+                [255, 228, 196], // Bisque
+                [244, 164, 96],  // SandyBrown
+                [205, 92, 92],   // IndianRed
+                [139, 0, 0],     // DarkRed (darkest)
+                [255, 140, 0],   // DarkOrange (bright accent)
+                [101, 67, 33],   // Dark Brown (earthy tone)
+            ],
+            'ocean-breeze': [
+                [240, 255, 255], // Azure (lightest)
+                [176, 224, 230], // PowderBlue
+                [95, 158, 160],  // CadetBlue
+                [70, 130, 180],  // SteelBlue
+                [25, 25, 112],   // MidnightBlue (darkest)
+                [0, 255, 255],   // Cyan (bright accent)
+                [255, 255, 240], // Ivory (cream accent)
+            ]
+        };
+
+        /**
+         * Converts a hex color string to an RGB array.
+         * @param {string} hex - The hex color string (e.g., "#RRGGBB").
+         * @returns {number[]} An array [R, G, B].
+         */
+        function hexToRgb(hex) {
+            const bigint = parseInt(hex.slice(1), 16);
+            const r = (bigint >> 16) & 255;
+            const g = (bigint >> 8) & 255;
+            const b = bigint & 255;
+            return [r, g, b];
+        }
+
+        /**
+         * Converts an RGB array to a hex color string.
+         * @param {number[]} rgb - An array [R, G, B].
+         * @returns {string} The hex color string (e.g., "#RRGGBB").
+         */
+        function rgbToHex(rgb) {
+            return "#" + ((1 << 24) + (rgb[0] << 16) + (rgb[1] << 8) + rgb[2]).toString(16).slice(1).toUpperCase();
+        }
+
+        /**
+         * Finds the closest color in a predefined palette for a given RGB color.
+         * Uses Euclidean distance in RGB space.
+         * @param {number[]} rgb - [R, G, B] array of the color to match.
+         * @param {number[][]} palette - Array of [R, G, B] colors in the palette.
+         * @returns {number[]} The [R, G, B] of the closest color in the palette.
+         */
+        function findClosestColor(rgb, palette) {
+            let minDistance = Infinity;
+            let closestColor = [];
+
+            for (let i = 0; i < palette.length; i++) {
+                const pColor = palette[i];
+                const distance = Math.sqrt(
+                    Math.pow(rgb[0] - pColor[0], 2) +
+                    Math.pow(rgb[1] - pColor[1], 2) +
+                    Math.pow(rgb[2] - pColor[2], 2)
+                );
+
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    closestColor = pColor;
+                }
+            }
+            return closestColor;
+        }
+
+        /**
+         * Extracts dominant colors from an image using a simple color quantization and frequency count.
+         * @param {Image} img - The image element.
+         * @param {number} numColors - The desired number of dominant colors.
+         * @returns {number[][]} An array of [R, G, B] arrays representing dominant colors.
+         */
+        function extractDominantColors(img, numColors = 8) {
+            const tempCanvas = document.createElement('canvas');
+            const tempCtx = tempCanvas.getContext('2d');
+
+            // Downscale image for faster processing
+            const scaleFactor = 0.2; // Process at 20% of original size
+            tempCanvas.width = img.width * scaleFactor;
+            tempCanvas.height = img.height * scaleFactor;
+            tempCtx.drawImage(img, 0, 0, tempCanvas.width, tempCanvas.height);
+
+            const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+            const data = imageData.data;
+
+            const colorCounts = {};
+            const quantizationFactor = 32; // Group colors into 32x32x32 cubes
+
+            for (let i = 0; i < data.length; i += 4) {
+                const r = Math.floor(data[i] / quantizationFactor) * quantizationFactor;
+                const g = Math.floor(data[i + 1] / quantizationFactor) * quantizationFactor;
+                const b = Math.floor(data[i + 2] / quantizationFactor) * quantizationFactor;
+                const colorKey = `${r},${g},${b}`;
+                colorCounts[colorKey] = (colorCounts[colorKey] || 0) + 1;
+            }
+
+            const sortedColors = Object.entries(colorCounts).sort(([, countA], [, countB]) => countB - countA);
+
+            const dominantColors = sortedColors.slice(0, numColors).map(([key]) => {
+                return key.split(',').map(Number);
+            });
+
+            // Ensure there's at least one color, default to black if none found (unlikely)
+            if (dominantColors.length === 0) {
+                dominantColors.push([0, 0, 0]);
+            }
+            return dominantColors;
+        }
+
+
+        /**
+         * Converts an image to an Art Deco inspired style using blur and color palette mapping.
+         * @param {Image} img - The original image element.
+         * @param {number} blurRadius - The radius of the blur to apply (in pixels).
+         * @param {number[][]} selectedPalette - The color palette to use for mapping.
+         * @returns {ImageData} - The processed image data.
+         */
+        function processImageForArtDeco(img, blurRadius, selectedPalette) {
+            // Create a temporary canvas to draw and process the image
+            const tempCanvas = document.createElement('canvas');
+            const tempCtx = tempCanvas.getContext('2d');
+
+            // Limit image dimensions for performance, maintain aspect ratio
+            const maxWidth = 600;
+            const maxHeight = 900; // Aim for a taller aspect ratio for poster style
+
+            let imgWidth = img.width;
+            let imgHeight = img.height;
+
+            // Resize image to fit within max dimensions while maintaining aspect ratio
+            if (imgWidth > maxWidth || imgHeight > maxHeight) {
+                if (imgWidth / maxWidth > imgHeight / maxHeight) {
+                    imgHeight = Math.round(imgHeight * (maxWidth / imgWidth));
+                    imgWidth = maxWidth;
+                } else {
+                    imgWidth = Math.round(imgWidth * (maxHeight / imgHeight));
+                    imgHeight = maxHeight;
+                }
+            }
+            
+            tempCanvas.width = imgWidth;
+            tempCanvas.height = imgHeight;
+
+            // Apply blur filter *before* getting image data for color mapping
+            if (blurRadius > 0) {
+                tempCtx.filter = `blur(${blurRadius}px)`;
+            } else {
+                tempCtx.filter = 'none'; // Remove filter if radius is 0
+            }
+            tempCtx.drawImage(img, 0, 0, imgWidth, imgHeight);
+            tempCtx.filter = 'none'; // Reset filter so future draws aren't blurred
+
+            const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+            const data = imageData.data;
+
+            // Apply color palette mapping
+            for (let i = 0; i < data.length; i += 4) {
+                const originalRGB = [data[i], data[i + 1], data[i + 2]];
+                const newRGB = findClosestColor(originalRGB, selectedPalette);
+                data[i] = newRGB[0];     // Red
+                data[i + 1] = newRGB[1]; // Green
+                data[i + 2] = newRGB[2]; // Blue
+                // Alpha (data[i + 3]) remains unchanged
+            }
+            return imageData;
+        }
+
+        // Function to draw the poster on the canvas
+        function drawPoster() {
+            // Define fixed poster dimensions for a classic Art Deco look
+            const posterWidth = 800;
+            const posterHeight = 1200; // Common tall poster aspect ratio (e.g., 2:3)
+
+            posterCanvas.width = posterWidth;
+            posterCanvas.height = posterHeight;
+
+            ctx.clearRect(0, 0, posterWidth, posterHeight); // Clear canvas
+
+            // Background for the whole poster (a simple light color for now)
+            ctx.fillStyle = '#f0f4f8'; // A light off-white/gray for the poster background
+            ctx.fillRect(0, 0, posterWidth, posterHeight);
+
+            // Draw the processed image if available, otherwise the original image
+            if (processedImageData) {
+                // Create a temporary canvas to hold the processed image data
+                const tempCanvasForDrawing = document.createElement('canvas');
+                const tempCtxForDrawing = tempCanvasForDrawing.getContext('2d');
+                tempCanvasForDrawing.width = processedImageData.width;
+                tempCanvasForDrawing.height = processedImageData.height;
+                tempCtxForDrawing.putImageData(processedImageData, 0, 0);
+
+                // Calculate position and size to fit image nicely within the poster
+                const imageAspectRatio = processedImageData.width / processedImageData.height;
+                
+                let drawWidth, drawHeight, drawX, drawY;
+
+                const maxImageHeight = posterHeight * 0.7; // Max 70% of poster height
+                const maxImageWidth = posterWidth * 0.9; // Max 90% of poster width
+
+                if (imageAspectRatio > (maxImageWidth / maxImageHeight)) {
+                    // Image is wider than the allocated space aspect ratio
+                    drawWidth = maxImageWidth;
+                    drawHeight = maxImageWidth / imageAspectRatio;
+                } else {
+                    // Image is taller or similar aspect ratio
+                    drawHeight = maxImageHeight;
+                    drawWidth = maxImageHeight * imageAspectRatio;
+                }
+
+                // Center the image horizontally
+                drawX = (posterWidth - drawWidth) / 2;
+                // Place image slightly lower from top to leave space for title
+                drawY = posterHeight * 0.15; // Start image at 15% from top
+
+                ctx.drawImage(tempCanvasForDrawing, drawX, drawY, drawWidth, drawHeight);
+            } else if (uploadedImage) {
+                // If image is uploaded but not processed yet, draw original (or placeholder)
+                   // Calculate position and size to fit image nicely within the poster
+                const imageAspectRatio = uploadedImage.width / uploadedImage.height;
+                
+                let drawWidth, drawHeight, drawX, drawY;
+
+                const maxImageHeight = posterHeight * 0.7; // Max 70% of poster height
+                const maxImageWidth = posterWidth * 0.9; // Max 90% of poster width
+
+                if (imageAspectRatio > (maxImageWidth / maxImageHeight)) {
+                    // Image is wider than the allocated space aspect ratio
+                    drawWidth = maxImageWidth;
+                    drawHeight = maxImageWidth / imageAspectRatio;
+                } else {
+                    // Image is taller or similar aspect ratio
+                    drawHeight = maxImageHeight;
+                    drawWidth = maxImageHeight * imageAspectRatio;
+                }
+
+                // Center the image horizontally
+                drawX = (posterWidth - drawWidth) / 2;
+                // Place image slightly lower from top to leave space for title
+                drawY = posterHeight * 0.15; // Start image at 15% from top
+                ctx.drawImage(uploadedImage, drawX, drawY, drawWidth, drawHeight);
+            }
+
+
+            // Draw the title
+            const posterTitle = posterTitleInput.value.toUpperCase(); // Art Deco often uses all caps
+            const titleColor = titleColorInput.value;
+            const titleFontSize = parseInt(titleFontSizeInput.value) || 60; // Default if invalid
+            ctx.fillStyle = titleColor;
+            ctx.font = `bold ${titleFontSize}px 'Inter', sans-serif`; // Use Inter, bold
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top'; // Align text from the top
+            // Position title above the image
+            ctx.fillText(posterTitle, posterWidth / 2, posterHeight * 0.05); // 5% from top
+
+            // Draw the slogan
+            const posterSlogan = posterSloganInput.value.toUpperCase();
+            const sloganColor = sloganColorInput.value;
+            const sloganFontSize = parseInt(sloganFontSizeInput.value) || 30; // Default if invalid
+            ctx.fillStyle = sloganColor;
+            ctx.font = `${sloganFontSize}px 'Inter', sans-serif`; // Art Deco often has bold primary, less bold secondary
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'bottom'; // Align text from the bottom
+            // Position slogan below the image
+            ctx.fillText(posterSlogan, posterWidth / 2, posterHeight * 0.95); // 95% from top
+
+            updatePaletteDisplay(currentPalette); // Update the displayed palette swatches
+        }
+
+        // Function to update the custom color input fields based on numCustomColors
+        function updateCustomColorInputs() {
+            const numColors = parseInt(numCustomColorsInput.value);
+            numCustomColorsValueSpan.textContent = `${numColors} colors`;
+            customColorInputsContainer.innerHTML = ''; // Clear existing inputs
+
+            // Ensure customColors array has enough elements, add default if needed
+            while (customColors.length < numColors) {
+                customColors.push("#CCCCCC"); // Add a default gray color
+            }
+            // Trim customColors if numColors is reduced
+            customColors = customColors.slice(0, numColors);
+
+            for (let i = 0; i < numColors; i++) {
+                const div = document.createElement('div');
+                div.innerHTML = `
+                    <label for="customColor${i}" class="block text-gray-700 text-sm font-bold mb-2">Color ${i + 1}:</label>
+                    <input type="color" id="customColor${i}" value="${customColors[i]}" class="w-full h-10 rounded-md border border-gray-300 custom-color-input">
+                `;
+                customColorInputsContainer.appendChild(div);
+            }
+
+            // Attach event listeners to the newly created color inputs
+            document.querySelectorAll('.custom-color-input').forEach((input, index) => {
+                input.addEventListener('input', (e) => {
+                    customColors[index] = e.target.value;
+                });
+            });
+        }
+
+        // Function to update the image-derived color input fields
+        function updateImageDerivedColorInputs() {
+            const numColors = parseInt(numImageDerivedColorsInput.value);
+            numImageDerivedColorsValueSpan.textContent = `${numColors} colors`;
+            imageDerivedColorInputsContainer.innerHTML = ''; // Clear existing inputs
+
+            // Re-extract dominant colors if the number of colors changes or if we're initializing
+            if (uploadedImage && (imageDerivedColors.length !== numColors || imageDerivedColors.length === 0)) {
+                imageDerivedColors = extractDominantColors(uploadedImage, numColors);
+            } else if (!uploadedImage) {
+                imageDerivedColors = Array.from({length: numColors}, () => [200, 200, 200]); // Default if no image
+            }
+
+            // Ensure imageDerivedColors array has enough elements, add default if needed
+            while (imageDerivedColors.length < numColors) {
+                imageDerivedColors.push([200, 200, 200]); // Add a default gray color
+            }
+            // Trim imageDerivedColors if numColors is reduced
+            imageDerivedColors = imageDerivedColors.slice(0, numColors);
+
+
+            for (let i = 0; i < numColors; i++) {
+                const div = document.createElement('div');
+                div.innerHTML = `
+                    <label for="imageDerivedColor${i}" class="block text-gray-700 text-sm font-bold mb-2">Color ${i + 1}:</label>
+                    <input type="color" id="imageDerivedColor${i}" value="${rgbToHex(imageDerivedColors[i])}" class="w-full h-10 rounded-md border border-gray-300 image-derived-color-input">
+                `;
+                imageDerivedColorInputsContainer.appendChild(div);
+            }
+
+            // Attach event listeners to the newly created color inputs
+            document.querySelectorAll('.image-derived-color-input').forEach((input, index) => {
+                input.addEventListener('input', (e) => {
+                    imageDerivedColors[index] = hexToRgb(e.target.value);
+                });
+            });
+        }
+
+        // Function to update the displayed palette swatches
+        function updatePaletteDisplay(palette) {
+            paletteColorSwatches.innerHTML = ''; // Clear existing swatches
+            palette.forEach(color => {
+                const swatch = document.createElement('div');
+                swatch.className = 'palette-display-color';
+                swatch.style.backgroundColor = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
+                paletteColorSwatches.appendChild(swatch);
+            });
+        }
+
+        // Event listener for image file input change
+        imageUpload.addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (file) {
+                if (!file.type.startsWith('image/')) {
+                    showMessage('Please upload an image file (JPG, PNG, GIF).', 'error');
+                    imagePreview.classList.add('hidden');
+                    imagePlaceholder.classList.remove('hidden');
+                    renderButton.disabled = true;
+                    uploadedImage = null;
+                    processedImageData = null; // Clear processed data
+                    return;
+                }
+
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const img = new Image();
+                    img.onload = function() {
+                        uploadedImage = img;
+                        processedImageData = null; // Clear previous processed data
+                        imagePreview.src = e.target.result;
+                        imagePreview.classList.remove('hidden');
+                        imagePlaceholder.classList.add('hidden');
+                        renderButton.disabled = false; // Enable button once image is loaded
+                        
+                        // If image-derived is selected, re-extract colors
+                        if (paletteSelector.value === 'image-derived') {
+                            updateImageDerivedColorInputs(); // This will re-extract and update inputs
+                            currentPalette = imageDerivedColors; // Set current palette to the newly extracted ones
+                            processedImageData = processImageForArtDeco(uploadedImage, parseInt(blurRadiusInput.value), currentPalette);
+                        }
+                        drawPoster(); // Redraw canvas with original image initially or processed if image-derived
+                    };
+                    img.onerror = function() {
+                        showMessage('Could not load image. Please try a different file.', 'error');
+                        imagePreview.classList.add('hidden');
+                        imagePlaceholder.classList.remove('hidden');
+                        renderButton.disabled = true;
+                        uploadedImage = null;
+                        processedImageData = null;
+                    };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            } else {
+                imagePreview.classList.add('hidden');
+                imagePlaceholder.classList.remove('hidden');
+                renderButton.disabled = true;
+                uploadedImage = null;
+                processedImageData = null;
+                ctx.clearRect(0, 0, posterCanvas.width, posterCanvas.height); // Clear canvas if no image
+                updatePaletteDisplay([]); // Clear palette display
+            }
+        });
+
+        // Optional: Handle drag and drop for file upload
+        const customFileUpload = document.querySelector('.custom-file-upload');
+        customFileUpload.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            customFileUpload.classList.add('border-blue-500');
+        });
+        customFileUpload.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            customFileUpload.classList.remove('border-blue-500');
+        });
+        customFileUpload.addEventListener('drop', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            customFileUpload.classList.remove('border-blue-500');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                imageUpload.files = files; // Assign dropped files to input
+                const event = new Event('change');
+                imageUpload.dispatchEvent(event); // Trigger change event
+            }
+        });
+
+        // Event listeners for text input and color/font size changes
+        posterTitleInput.addEventListener('input', drawPoster);
+        posterSloganInput.addEventListener('input', drawPoster);
+        titleColorInput.addEventListener('input', drawPoster);
+        sloganColorInput.addEventListener('input', drawPoster);
+        titleFontSizeInput.addEventListener('input', drawPoster);
+        sloganFontSizeInput.addEventListener('input', drawPoster);
+        
+        // Event listener for blur radius changes
+        blurRadiusInput.addEventListener('input', () => {
+            blurValueSpan.textContent = `${blurRadiusInput.value} pixels`;
+            // If an image is loaded, trigger re-processing and redraw
+            if (uploadedImage && currentPalette.length > 0) {
+                processedImageData = processImageForArtDeco(uploadedImage, parseInt(blurRadiusInput.value), currentPalette);
+                drawPoster();
+            } else {
+                drawPoster(); // Just redraw text if no image or palette
+            }
+        });
+
+        // Event listener for main palette selector changes
+        paletteSelector.addEventListener('change', () => {
+            const selectedOption = paletteSelector.value;
+
+            // Hide all palette-specific controls first
+            readyMadePalettesSection.classList.add('hidden');
+            customPaletteControls.classList.add('hidden');
+            imageDerivedPaletteControls.classList.add('hidden');
+
+            if (selectedOption === 'ready-made') {
+                readyMadePalettesSection.classList.remove('hidden');
+                // Trigger change on predefined selector to apply default ready-made palette
+                predefinedPaletteSelector.dispatchEvent(new Event('change'));
+            } else if (selectedOption === 'custom') {
+                customPaletteControls.classList.remove('hidden');
+                updateCustomColorInputs(); // Initialize custom color inputs
+                // No automatic application here, user must click "Apply Custom Palette"
+                currentPalette = []; // Clear current palette until custom is applied
+                drawPoster(); // Redraw with original image or clear if no image
+            } else if (selectedOption === 'image-derived') {
+                imageDerivedPaletteControls.classList.remove('hidden');
+                if (uploadedImage) {
+                    updateImageDerivedColorInputs(); // This will extract and populate inputs
+                    currentPalette = imageDerivedColors; // Set current palette to the newly extracted ones
+                    processedImageData = processImageForArtDeco(uploadedImage, parseInt(blurRadiusInput.value), currentPalette);
+                    drawPoster();
+                    showMessage('Image-derived palette applied!', 'success');
+                } else {
+                    showMessage('Please upload an image first to use the Image-Derived Palette.', 'warning');
+                    // Revert to ready-made if no image
+                    paletteSelector.value = 'ready-made';
+                    readyMadePalettesSection.classList.remove('hidden');
+                    predefinedPaletteSelector.dispatchEvent(new Event('change'));
+                }
+            }
+        });
+
+        // Event listener for predefined palette selector changes
+        predefinedPaletteSelector.addEventListener('change', () => {
+            if (uploadedImage) {
+                const selectedPaletteKey = predefinedPaletteSelector.value;
+                currentPalette = artDecoPalettes[selectedPaletteKey];
+                processedImageData = processImageForArtDeco(uploadedImage, parseInt(blurRadiusInput.value), currentPalette);
+                drawPoster();
+            } else {
+                // If no image, just update the currentPalette variable for display
+                const selectedPaletteKey = predefinedPaletteSelector.value;
+                currentPalette = artDecoPalettes[selectedPaletteKey];
+                updatePaletteDisplay(currentPalette);
+            }
+        });
+
+        // Custom Palette Controls
+        numCustomColorsInput.addEventListener('input', updateCustomColorInputs);
+
+        addCustomColorButton.addEventListener('click', () => {
+            let num = parseInt(numCustomColorsInput.value);
+            if (num < 10) {
+                numCustomColorsInput.value = num + 1;
+                updateCustomColorInputs();
+            } else {
+                showMessage('Maximum 10 custom colors allowed.', 'warning');
+            }
+        });
+
+        removeCustomColorButton.addEventListener('click', () => {
+            let num = parseInt(numCustomColorsInput.value);
+            if (num > 1) {
+                numCustomColorsInput.value = num - 1;
+                updateCustomColorInputs();
+            } else {
+                showMessage('Minimum 1 custom color required.', 'warning');
+            }
+        });
+
+        applyCustomPaletteButton.addEventListener('click', () => {
+            if (!uploadedImage) {
+                showMessage('Please upload an image first to apply a custom palette.', 'warning');
+                return;
+            }
+            const newCustomPalette = [];
+            document.querySelectorAll('#customColorInputs .custom-color-input').forEach(input => {
+                newCustomPalette.push(hexToRgb(input.value));
+            });
+            currentPalette = newCustomPalette;
+            processedImageData = processImageForArtDeco(uploadedImage, parseInt(blurRadiusInput.value), currentPalette);
+            drawPoster();
+            showMessage('Custom palette applied!', 'success');
+        });
+
+        // Image-Derived Palette Controls
+        numImageDerivedColorsInput.addEventListener('input', () => {
+            updateImageDerivedColorInputs();
+            // Automatically apply the new image-derived palette when slider changes
+            if (uploadedImage) {
+                currentPalette = imageDerivedColors;
+                processedImageData = processImageForArtDeco(uploadedImage, parseInt(blurRadiusInput.value), currentPalette);
+                drawPoster();
+            }
+        });
+
+        addImageDerivedColorButton.addEventListener('click', () => {
+            let num = parseInt(numImageDerivedColorsInput.value);
+            if (num < 15) { // Max 15 for image-derived
+                numImageDerivedColorsInput.value = num + 1;
+                updateImageDerivedColorInputs();
+                if (uploadedImage) {
+                    currentPalette = imageDerivedColors;
+                    processedImageData = processImageForArtDeco(uploadedImage, parseInt(blurRadiusInput.value), currentPalette);
+                    drawPoster();
+                }
+            } else {
+                showMessage('Maximum 15 image-derived colors allowed.', 'warning');
+            }
+        });
+
+        removeImageDerivedColorButton.addEventListener('click', () => {
+            let num = parseInt(numImageDerivedColorsInput.value);
+            if (num > 2) { // Min 2 for image-derived
+                numImageDerivedColorsInput.value = num - 1;
+                updateImageDerivedColorInputs();
+                if (uploadedImage) {
+                    currentPalette = imageDerivedColors;
+                    processedImageData = processImageForArtDeco(uploadedImage, parseInt(blurRadiusInput.value), currentPalette);
+                    drawPoster();
+                }
+            } else {
+                showMessage('Minimum 2 image-derived colors required.', 'warning');
+            }
+        });
+
+        applyImageDerivedPaletteButton.addEventListener('click', () => {
+            if (!uploadedImage) {
+                showMessage('Please upload an image first to apply the image-derived palette.', 'warning');
+                return;
+            }
+            // The imageDerivedColors array is already updated by updateImageDerivedColorInputs
+            currentPalette = imageDerivedColors;
+            processedImageData = processImageForArtDeco(uploadedImage, parseInt(blurRadiusInput.value), currentPalette);
+            drawPoster();
+            showMessage('Image-derived palette applied!', 'success');
+        });
+
+
+        // Initial draw of the empty poster or default state
+        drawPoster();
+        // Set initial palette to classic Art Deco
+        currentPalette = artDecoPalettes['classic'];
+        updatePaletteDisplay(currentPalette); // Display initial palette
+
+        // Event listener for the "Apply Style & Render" button
+        renderButton.addEventListener('click', function() {
+            if (!uploadedImage) {
+                showMessage('Please upload an image first to apply style and render the poster.', 'warning');
+                return;
+            }
+            
+            // Get current blur radius and selected palette
+            const blurRadius = parseInt(blurRadiusInput.value);
+            const selectedPaletteOption = paletteSelector.value;
+
+            if (selectedPaletteOption === 'image-derived') {
+                // Use the currently adjusted imageDerivedColors
+                currentPalette = imageDerivedColors; 
+            } else if (selectedPaletteOption === 'custom') {
+                // Re-read custom colors from inputs for final render
+                const newCustomPalette = [];
+                document.querySelectorAll('#customColorInputs .custom-color-input').forEach(input => {
+                    newCustomPalette.push(hexToRgb(input.value));
+                });
+                currentPalette = newCustomPalette;
+            } else { // ready-made
+                const selectedPaletteKey = predefinedPaletteSelector.value;
+                currentPalette = artDecoPalettes[selectedPaletteKey];
+            }
+
+            // Process the image with the blur and Art Deco color palette
+            processedImageData = processImageForArtDeco(uploadedImage, blurRadius, currentPalette);
+
+            // Draw the processed image and text
+            drawPoster();
+            
+            // Show download section
+            downloadSection.classList.remove('hidden');
+            // Set download link href from canvas data
+            downloadLink.href = posterCanvas.toDataURL('image/png');
+            showMessage('Poster styled and rendered successfully!', 'success');
+        });
+
+        // Initialize UI visibility and default palette
+        paletteSelector.dispatchEvent(new Event('change')); // Trigger initial state
+    </script>
+</body>
+</html>
