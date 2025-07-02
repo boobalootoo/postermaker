@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Art Deco Travel Poster Creator</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Custom styles for the Inter font and overall aesthetic */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8; /* Light gray-blue background */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 1rem;
+        }
+        .container {
+            max-width: 1000px; /* Increased max-width for more content */
+            width: 100%;
+        }
+        .card {
+            background-color: #ffffff;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            border-radius: 12px;
+        }
+        .button-primary {
+            background-color: #4a5568; /* Darker gray for primary action */
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: background-color 0.2s ease;
+        }
+        .button-primary:hover {
+            background-color: #2d3748; /* Even darker on hover */
+        }
+        input[type="file"] {
+            display: none; /* Hide default file input */
+        }
+        .custom-file-upload {
+            border: 2px dashed #a0aec0; /* Light gray dashed border */
+            padding: 1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            text-align: center;
+            color: #4a5568; /* Darker gray text */
+            transition: border-color 0.2s ease;
+        }
+        .custom-file-upload:hover {
+            border-color: #4299e1; /* Blue on hover */
+        }
+        .image-preview-container {
+            min-height: 150px; /* Adjusted min-height for input area */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #edf2f7; /* Lighter gray background for image areas */
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid #cbd5e0; /* Light border */
+        }
+        .image-preview {
+            max-width: 100%;
+            max-height: 300px; /* Limit height for better display */
+            height: auto;
+            border-radius: 6px;
+        }
+        canvas {
+            background-color: #f0f4f8; /* Canvas background for visibility */
+            border: 1px solid #cbd5e0;
+            border-radius: 8px;
+            display: block;
+            width: 100%; /* Make canvas responsive */
+            height: auto; /* Maintain aspect ratio */
+        }
+        /* Message box styling */
+        .message-box {
+            background-color: #fff3cd;
+            border: 1px solid #ffeeba;
+            color: #856404;
+            padding: 0.75rem 1.25rem;
+            border-radius: 0.25rem;
+            margin-bottom: 1rem;
+            text-align: center;
+            transition: opacity 0.3s ease-in-out;
+            opacity: 0; /* Hidden by default */
+        }
+        .message-box.show {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container mx-auto p-6 bg-white rounded-lg shadow-xl card">
+        <h1 class="text-3xl sm:text-4xl font-bold text-center mb-6 text-gray-800">
+            Art Deco Travel Poster Creator
+        </h1>
+        <p class="text-center text-gray-600 mb-8">
+            Upload an image, add text, and apply Art Deco inspired stylization.
+        </p>
+
+        <div id="messageBox" class="message-box hidden" role="alert"></div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+            <!-- Left Panel: Image Upload and Controls -->
+            <div>
+                <h2 class="text-2xl font-semibold text-gray-700 mb-4">Your Image & Text</h2>
+
+                <!-- Image Upload -->
+                <label for="imageUpload" class="custom-file-upload block mb-4">
+                    <input type="file" id="imageUpload" accept="image/*">
+                    <p class="text-lg font-semibold mb-2">Click or drag an image here</p>
+                    <p class="text-sm text-gray-500">Supported formats: JPG, PNG, GIF</p>
+                </label>
+                <div class="image-preview-container border border-gray-300 rounded-lg flex items-center justify-center p-4 mb-6">
+                    <img id="imagePreview" class="image-preview hidden" src="#" alt="Image Preview">
+                    <p id="imagePlaceholder" class="text-gray-400">Your uploaded image will appear here</p>
+                </div>
+
+                <!-- Text Inputs -->
+                <div class="mb-4">
+                    <label for="posterTitle" class="block text-gray-700 text-sm font-bold mb-2">Poster Title:</label>
+                    <input type="text" id="posterTitle" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline rounded-md p-2" placeholder="e.g., VISIT PARIS">
+                </div>
+                <div class="mb-4">
+                    <label for="posterSlogan" class="block text-gray-700 text-sm font-bold mb-2">Poster Slogan:</label>
+                    <input type="text" id="posterSlogan" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline rounded-md p-2" placeholder="e.g., CITY OF LIGHTS">
+                </div>
+
+                <!-- Text Color Pickers -->
+                <div class="grid grid-cols-2 gap-4 mb-6">
+                    <div>
+                        <label for="titleColor" class="block text-gray-700 text-sm font-bold mb-2">Title Color:</label>
+                        <input type="color" id="titleColor" value="#FFFFFF" class="w-full h-10 rounded-md border border-gray-300">
+                    </div>
+                    <div>
+                        <label for="sloganColor" class="block text-gray-700 text-sm font-bold mb-2">Slogan Color:</label>
+                        <input type="color" id="sloganColor" value="#F0C674" class="w-full h-10 rounded-md border border-gray-300">
+                    </div>
+                </div>
+
+                <!-- Font Size Controls -->
+                <div class="grid grid-cols-2 gap-4 mb-6">
+                    <div>
+                        <label for="titleFontSize" class="block text-gray-700 text-sm font-bold mb-2">Title Font Size (px):</label>
+                        <input type="number" id="titleFontSize" value="60" min="10" max="200" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline rounded-md p-2">
+                    </div>
+                    <div>
+                        <label for="sloganFontSize" class="block text-gray-700 text-sm font-bold mb-2">Slogan Font Size (px):</label>
+                        <input type="number" id="sloganFontSize" value="30" min="10" max="100" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline rounded-md p-2">
+                    </div>
+                </div>
+                
+                <!-- Stylization Controls -->
+                <div class="mb-4">
+                    <h3 class="text-lg font-semibold text-gray-700 mb-2">Image Stylization:</h3>
+                    <div class="mb-4">
+                        <label for="paletteSelector" class="block text-gray-700 text-sm font-bold mb-2">Choose Color Palette:</label>
+                        <select id="paletteSelector" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline rounded-md p-2">
+                            <option value="classic">Classic Art Deco</option>
+                            <option value="cool">Cool Tones</option>
+                            <option value="warm">Warm Tones</option>
+                            <option value="monochrome-gold">Monochrome with Gold Accent</option>
+                            <option value="vibrant-retro">Vibrant Retro</option>
+                        </select>
+                    </div>
+                    <label for="blurRadius" class="block text-gray-700 text-sm font-bold mb-2">Blur Radius (pixels):</label>
+                    <input type="range" id="blurRadius" min="0" max="10" value="2" class="w-full h-6 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                    <span id="blurValue" class="text-sm text-gray-600">2 pixels</span>
+                </div>
+
+            </div>
+
+            <!-- Right Panel: Canvas Output -->
+            <div>
+                <h2 class="text-2xl font-semibold text-gray-700 mb-4">Your Poster Preview</h2>
+                <canvas id="posterCanvas" width="800" height="1200" class="w-full rounded-lg shadow-md"></canvas>
+                <div class="mt-6 text-center">
+                    <button id="renderButton" class="button-primary w-full md:w-auto hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 transition-all duration-300" disabled>
+                        Apply Style & Render
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Download Button -->
+        <div id="downloadSection" class="hidden text-center mt-6">
+            <a id="downloadLink" href="#" download="art-deco-poster.png" class="button-primary bg-green-600 hover:bg-green-700">
+                Download Poster
+            </a>
+        </div>
+    </div>
+
+    <script>
+        // Get references to DOM elements
+        const imageUpload = document.getElementById('imageUpload');
+        const imagePreview = document.getElementById('imagePreview');
+        const imagePlaceholder = document.getElementById('imagePlaceholder');
+        const posterCanvas = document.getElementById('posterCanvas');
+        const ctx = posterCanvas.getContext('2d');
+        const posterTitleInput = document.getElementById('posterTitle');
+        const posterSloganInput = document.getElementById('posterSlogan');
+        const titleColorInput = document.getElementById('titleColor');
+        const sloganColorInput = document.getElementById('sloganColor');
+        const titleFontSizeInput = document.getElementById('titleFontSize');
+        const sloganFontSizeInput = document.getElementById('sloganFontSize');
+        const renderButton = document.getElementById('renderButton');
+        const downloadSection = document.getElementById('downloadSection');
+        const downloadLink = document.getElementById('downloadLink');
+        const messageBox = document.getElementById('messageBox');
+        const blurRadiusInput = document.getElementById('blurRadius');
+        const blurValueSpan = document.getElementById('blurValue');
+        const paletteSelector = document.getElementById('paletteSelector');
+
+
+        let uploadedImage = null; // Stores the original Image object
+        let processedImageData = null; // Stores the processed ImageData for drawing
+
+        // Function to display messages to the user
+        function showMessage(message, type = 'warning') {
+            messageBox.textContent = message;
+            messageBox.className = 'message-box show'; // Reset classes
+            if (type === 'error') {
+                messageBox.style.backgroundColor = '#f8d7da';
+                messageBox.style.borderColor = '#f5c6cb';
+                messageBox.style.color = '#721c24';
+            } else if (type === 'success') {
+                messageBox.style.backgroundColor = '#d4edda';
+                messageBox.style.borderColor = '#c3e6cb';
+                messageBox.style.color = '#155724';
+            } else { // warning or default
+                messageBox.style.backgroundColor = '#fff3cd';
+                messageBox.style.borderColor = '#ffeeba';
+                messageBox.style.color = '#856404';
+            }
+            setTimeout(() => {
+                messageBox.classList.remove('show');
+            }, 5000); // Hide after 5 seconds
+        }
+
+        // Define multiple Art Deco Color Palettes
+        const artDecoPalettes = {
+            'classic': [
+                [255, 255, 255], // White
+                [0, 0, 0],       // Black
+                [20, 80, 120],   // Deep Blue
+                [180, 150, 90],  // Gold/Bronze
+                [150, 40, 40],   // Deep Red
+                [220, 200, 160], // Cream/Beige
+                [80, 120, 80],   // Forest Green
+                [50, 50, 50],    // Dark Gray
+            ],
+            'cool': [
+                [240, 248, 255], // AliceBlue (lightest)
+                [173, 216, 230], // LightBlue
+                [100, 149, 237], // CornflowerBlue
+                [65, 105, 225],  // RoyalBlue
+                [25, 25, 112],   // MidnightBlue (darkest)
+                [70, 80, 90],    // Darkish Grey
+            ],
+            'warm': [
+                [255, 248, 220], // Cornsilk (lightest)
+                [255, 228, 181], // Moccasin
+                [210, 180, 140], // Tan
+                [139, 69, 19],   // SaddleBrown
+                [101, 67, 33],   // Dark Brown (darkest)
+                [180, 150, 90],  // Gold
+            ],
+            'monochrome-gold': [
+                [255, 255, 255], // White
+                [220, 220, 220], // Gainsboro
+                [169, 169, 169], // DarkGray
+                [105, 105, 105], // DimGray
+                [50, 50, 50],    // Darker Gray
+                [0, 0, 0],       // Black
+                [212, 175, 55],  // Gold Accent
+            ],
+            'vibrant-retro': [
+                [255, 105, 180], // Hot Pink
+                [0, 206, 209],   // Dark Turquoise
+                [255, 215, 0],   // Gold
+                [148, 0, 211],   // Dark Violet
+                [0, 191, 255],   // Deep Sky Blue
+                [255, 69, 0],    // Red-Orange
+                [0, 128, 0],     // Green
+            ]
+        };
+
+        /**
+         * Finds the closest color in a predefined palette for a given RGB color.
+         * Uses Euclidean distance in RGB space.
+         * @param {number[]} rgb - [R, G, B] array of the color to match.
+         * @param {number[][]} palette - Array of [R, G, B] colors in the palette.
+         * @returns {number[]} The [R, G, B] of the closest color in the palette.
+         */
+        function findClosestColor(rgb, palette) {
+            let minDistance = Infinity;
+            let closestColor = [];
+
+            for (let i = 0; i < palette.length; i++) {
+                const pColor = palette[i];
+                const distance = Math.sqrt(
+                    Math.pow(rgb[0] - pColor[0], 2) +
+                    Math.pow(rgb[1] - pColor[1], 2) +
+                    Math.pow(rgb[2] - pColor[2], 2)
+                );
+
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    closestColor = pColor;
+                }
+            }
+            return closestColor;
+        }
+
+        /**
+         * Converts an image to an Art Deco inspired style using blur and color palette mapping.
+         * @param {Image} img - The original image element.
+         * @param {number} blurRadius - The radius of the blur to apply (in pixels).
+         * @param {number[][]} selectedPalette - The color palette to use for mapping.
+         * @returns {ImageData} - The processed image data.
+         */
+        function processImageForArtDeco(img, blurRadius, selectedPalette) {
+            // Create a temporary canvas to draw and process the image
+            const tempCanvas = document.createElement('canvas');
+            const tempCtx = tempCanvas.getContext('2d');
+
+            // Limit image dimensions for performance, maintain aspect ratio
+            const maxWidth = 600;
+            const maxHeight = 900; // Aim for a taller aspect ratio for poster style
+
+            let imgWidth = img.width;
+            let imgHeight = img.height;
+
+            // Resize image to fit within max dimensions while maintaining aspect ratio
+            if (imgWidth > maxWidth || imgHeight > maxHeight) {
+                if (imgWidth / maxWidth > imgHeight / maxHeight) {
+                    imgHeight = Math.round(imgHeight * (maxWidth / imgWidth));
+                    imgWidth = maxWidth;
+                } else {
+                    imgWidth = Math.round(imgWidth * (maxHeight / imgHeight));
+                    imgHeight = maxHeight;
+                }
+            }
+            
+            tempCanvas.width = imgWidth;
+            tempCanvas.height = imgHeight;
+
+            // Apply blur filter *before* getting image data for color mapping
+            if (blurRadius > 0) {
+                tempCtx.filter = `blur(${blurRadius}px)`;
+            } else {
+                tempCtx.filter = 'none'; // Remove filter if radius is 0
+            }
+            tempCtx.drawImage(img, 0, 0, imgWidth, imgHeight);
+            tempCtx.filter = 'none'; // Reset filter so future draws aren't blurred
+
+            const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+            const data = imageData.data;
+
+            // Apply color palette mapping
+            for (let i = 0; i < data.length; i += 4) {
+                const originalRGB = [data[i], data[i + 1], data[i + 2]];
+                const newRGB = findClosestColor(originalRGB, selectedPalette);
+                data[i] = newRGB[0];     // Red
+                data[i + 1] = newRGB[1]; // Green
+                data[i + 2] = newRGB[2]; // Blue
+                // Alpha (data[i + 3]) remains unchanged
+            }
+            return imageData;
+        }
+
+        // Function to draw the poster on the canvas
+        function drawPoster() {
+            // Define fixed poster dimensions for a classic Art Deco look
+            const posterWidth = 800;
+            const posterHeight = 1200; // Common tall poster aspect ratio (e.g., 2:3)
+
+            posterCanvas.width = posterWidth;
+            posterCanvas.height = posterHeight;
+
+            ctx.clearRect(0, 0, posterWidth, posterHeight); // Clear canvas
+
+            // Background for the whole poster (a simple light color for now)
+            ctx.fillStyle = '#f0f4f8'; // A light off-white/gray for the poster background
+            ctx.fillRect(0, 0, posterWidth, posterHeight);
+
+            // Draw the processed image if available, otherwise the original image
+            if (processedImageData) {
+                // Create a temporary canvas to hold the processed image data
+                const tempCanvasForDrawing = document.createElement('canvas');
+                const tempCtxForDrawing = tempCanvasForDrawing.getContext('2d');
+                tempCanvasForDrawing.width = processedImageData.width;
+                tempCanvasForDrawing.height = processedImageData.height;
+                tempCtxForDrawing.putImageData(processedImageData, 0, 0);
+
+                // Calculate position and size to fit image nicely within the poster
+                const imageAspectRatio = processedImageData.width / processedImageData.height;
+                
+                let drawWidth, drawHeight, drawX, drawY;
+
+                const maxImageHeight = posterHeight * 0.7; // Max 70% of poster height
+                const maxImageWidth = posterWidth * 0.9; // Max 90% of poster width
+
+                if (imageAspectRatio > (maxImageWidth / maxImageHeight)) {
+                    // Image is wider than the allocated space aspect ratio
+                    drawWidth = maxImageWidth;
+                    drawHeight = maxImageWidth / imageAspectRatio;
+                } else {
+                    // Image is taller or similar aspect ratio
+                    drawHeight = maxImageHeight;
+                    drawWidth = maxImageHeight * imageAspectRatio;
+                }
+
+                // Center the image horizontally
+                drawX = (posterWidth - drawWidth) / 2;
+                // Place image slightly lower from top to leave space for title
+                drawY = posterHeight * 0.15; // Start image at 15% from top
+
+                ctx.drawImage(tempCanvasForDrawing, drawX, drawY, drawWidth, drawHeight);
+            } else if (uploadedImage) {
+                // If image is uploaded but not processed yet, draw original (or placeholder)
+                 // Calculate position and size to fit image nicely within the poster
+                const imageAspectRatio = uploadedImage.width / uploadedImage.height;
+                
+                let drawWidth, drawHeight, drawX, drawY;
+
+                const maxImageHeight = posterHeight * 0.7; // Max 70% of poster height
+                const maxImageWidth = posterWidth * 0.9; // Max 90% of poster width
+
+                if (imageAspectRatio > (maxImageWidth / maxImageHeight)) {
+                    // Image is wider than the allocated space aspect ratio
+                    drawWidth = maxImageWidth;
+                    drawHeight = maxImageWidth / imageAspectRatio;
+                } else {
+                    // Image is taller or similar aspect ratio
+                    drawHeight = maxImageHeight;
+                    drawWidth = maxImageHeight * imageAspectRatio;
+                }
+
+                // Center the image horizontally
+                drawX = (posterWidth - drawWidth) / 2;
+                // Place image slightly lower from top to leave space for title
+                drawY = posterHeight * 0.15; // Start image at 15% from top
+                ctx.drawImage(uploadedImage, drawX, drawY, drawWidth, drawHeight);
+            }
+
+
+            // Draw the title
+            const posterTitle = posterTitleInput.value.toUpperCase(); // Art Deco often uses all caps
+            const titleColor = titleColorInput.value;
+            const titleFontSize = parseInt(titleFontSizeInput.value) || 60; // Default if invalid
+            ctx.fillStyle = titleColor;
+            ctx.font = `bold ${titleFontSize}px 'Inter', sans-serif`; // Use Inter, bold
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top'; // Align text from the top
+            // Position title above the image
+            ctx.fillText(posterTitle, posterWidth / 2, posterHeight * 0.05); // 5% from top
+
+            // Draw the slogan
+            const posterSlogan = posterSloganInput.value.toUpperCase();
+            const sloganColor = sloganColorInput.value;
+            const sloganFontSize = parseInt(sloganFontSizeInput.value) || 30; // Default if invalid
+            ctx.fillStyle = sloganColor;
+            ctx.font = `${sloganFontSize}px 'Inter', sans-serif`; // Art Deco often has bold primary, less bold secondary
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'bottom'; // Align text from the bottom
+            // Position slogan below the image
+            ctx.fillText(posterSlogan, posterWidth / 2, posterHeight * 0.95); // 95% from top
+        }
+
+        // Event listener for image file input change
+        imageUpload.addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (file) {
+                if (!file.type.startsWith('image/')) {
+                    showMessage('Please upload an image file (JPG, PNG, GIF).', 'error');
+                    imagePreview.classList.add('hidden');
+                    imagePlaceholder.classList.remove('hidden');
+                    renderButton.disabled = true;
+                    uploadedImage = null;
+                    processedImageData = null; // Clear processed data
+                    return;
+                }
+
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const img = new Image();
+                    img.onload = function() {
+                        uploadedImage = img;
+                        processedImageData = null; // Clear previous processed data
+                        imagePreview.src = e.target.result;
+                        imagePreview.classList.remove('hidden');
+                        imagePlaceholder.classList.add('hidden');
+                        renderButton.disabled = false; // Enable button once image is loaded
+                        drawPoster(); // Redraw canvas with original image initially
+                    };
+                    img.onerror = function() {
+                        showMessage('Could not load image. Please try a different file.', 'error');
+                        imagePreview.classList.add('hidden');
+                        imagePlaceholder.classList.remove('hidden');
+                        renderButton.disabled = true;
+                        uploadedImage = null;
+                        processedImageData = null;
+                    };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            } else {
+                imagePreview.classList.add('hidden');
+                imagePlaceholder.classList.remove('hidden');
+                renderButton.disabled = true;
+                uploadedImage = null;
+                processedImageData = null;
+                ctx.clearRect(0, 0, posterCanvas.width, posterCanvas.height); // Clear canvas if no image
+            }
+        });
+
+        // Optional: Handle drag and drop for file upload
+        const customFileUpload = document.querySelector('.custom-file-upload');
+        customFileUpload.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            customFileUpload.classList.add('border-blue-500');
+        });
+        customFileUpload.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            customFileUpload.classList.remove('border-blue-500');
+        });
+        customFileUpload.addEventListener('drop', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            customFileUpload.classList.remove('border-blue-500');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                imageUpload.files = files; // Assign dropped files to input
+                const event = new Event('change');
+                imageUpload.dispatchEvent(event); // Trigger change event
+            }
+        });
+
+        // Event listeners for text input and color/font size changes
+        posterTitleInput.addEventListener('input', drawPoster);
+        posterSloganInput.addEventListener('input', drawPoster);
+        titleColorInput.addEventListener('input', drawPoster);
+        sloganColorInput.addEventListener('input', drawPoster);
+        titleFontSizeInput.addEventListener('input', drawPoster);
+        sloganFontSizeInput.addEventListener('input', drawPoster);
+        
+        // Event listener for blur radius changes
+        blurRadiusInput.addEventListener('input', () => {
+            blurValueSpan.textContent = `${blurRadiusInput.value} pixels`;
+            // If an image is loaded, re-process and redraw to show blur effect dynamically
+            if (uploadedImage) {
+                const selectedPaletteKey = paletteSelector.value;
+                const currentPalette = artDecoPalettes[selectedPaletteKey];
+                processedImageData = processImageForArtDeco(uploadedImage, parseInt(blurRadiusInput.value), currentPalette);
+                drawPoster();
+            }
+        });
+
+        // Event listener for palette selector changes
+        paletteSelector.addEventListener('change', () => {
+            if (uploadedImage) {
+                const selectedPaletteKey = paletteSelector.value;
+                const currentPalette = artDecoPalettes[selectedPaletteKey];
+                processedImageData = processImageForArtDeco(uploadedImage, parseInt(blurRadiusInput.value), currentPalette);
+                drawPoster();
+            }
+        });
+
+        // Initial draw of the empty poster or default state
+        drawPoster();
+
+        // Event listener for the "Apply Style & Render" button
+        renderButton.addEventListener('click', function() {
+            if (!uploadedImage) {
+                showMessage('Please upload an image first to apply style and render the poster.', 'warning');
+                return;
+            }
+            
+            // Get current blur radius and selected palette
+            const blurRadius = parseInt(blurRadiusInput.value);
+            const selectedPaletteKey = paletteSelector.value;
+            const currentPalette = artDecoPalettes[selectedPaletteKey];
+
+            // Process the image with the blur and Art Deco color palette
+            processedImageData = processImageForArtDeco(uploadedImage, blurRadius, currentPalette);
+
+            // Draw the processed image and text
+            drawPoster();
+            
+            // Show download section
+            downloadSection.classList.remove('hidden');
+            // Set download link href from canvas data
+            downloadLink.href = posterCanvas.toDataURL('image/png');
+            showMessage('Poster styled and rendered successfully!', 'success');
+        });
+    </script>
+</body>
+</html>
